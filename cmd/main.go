@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
@@ -70,16 +71,19 @@ func docsHandler(repo openapi.Repsitory) http.Handler {
 		key := vars["key"]
 		spec, err := repo.Spec(key)
 		if err != nil {
+			fmt.Println(err)
 			rw.WriteHeader(http.StatusNotFound)
 			return
 		}
 		raw, err := spec.JSONSpec()
 		if err != nil {
+			fmt.Println(err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		bytes, err := json.Marshal(raw)
 		if err != nil {
+			fmt.Println(err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}

@@ -36,9 +36,7 @@ func (r *staticRepository) Spec(key string) (Spec, error) {
 }
 
 type multiRepository struct {
-	delegates  []Repsitory
-	cachedKeys map[string]Repsitory
-	keys       []string
+	delegates []Repsitory
 }
 
 // AllOf returns a new Repository containing all the delegates
@@ -46,31 +44,27 @@ func AllOf(delegates ...Repsitory) Repsitory {
 	return &multiRepository{delegates: delegates}
 }
 
-func (r *multiRepository) cacheKeys() {
-	if r.keys != nil && r.cachedKeys != nil {
-		return
-	}
-	fmt.Println("caching keys")
-	r.cachedKeys = make(map[string]Repsitory)
+func (r *multiRepository) Keys() []string {
+	keySet := make(map[string]interface{})
+	keys := make([]string, 0)
 	for _, delegate := range r.delegates {
 		for _, key := range delegate.Keys() {
-			if _, ok := r.cachedKeys[key]; !ok {
-				r.cachedKeys[key] = delegate
-				r.keys = append(r.keys, key)
+			if _, ok := keySet[key]; !ok {
+				keySet[key] = nil
+				keys = append(keys, key)
 			}
 		}
 	}
-}
-
-func (r *multiRepository) Keys() []string {
-	r.cacheKeys()
-	return r.keys
+	return keys
 }
 
 func (r *multiRepository) Spec(key string) (Spec, error) {
-	r.cacheKeys()
-	if val, ok := r.cachedKeys[key]; ok {
-		return val.Spec(key)
+	for _, delegate := range r.delegates {
+		for _, k := range delegate.Keys() {
+			if k == key {
+				return delegate.Spec(key)
+			}
+		}
 	}
 	return nil, fmt.Errorf("not found %s", key)
 }

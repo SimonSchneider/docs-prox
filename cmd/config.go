@@ -8,6 +8,7 @@ import (
 	"github.com/SimonSchneider/docs-prox/openapi"
 	"github.com/SimonSchneider/docs-prox/providers/environment"
 	"github.com/SimonSchneider/docs-prox/providers/file"
+	"github.com/SimonSchneider/docs-prox/providers/kubernetes"
 )
 
 type config struct {
@@ -22,6 +23,10 @@ type config struct {
 			Enabled bool        `json:"enabled"`
 			Config  file.Config `json:"config"`
 		} `json:"file"`
+		Kubernetes struct {
+			Enabled bool              `json:"enabled"`
+			Config  kubernetes.Config `json:"config"`
+		} `json:"kubernetes"`
 	}
 }
 
@@ -55,6 +60,10 @@ func (c *config) buildProviders() openapi.Repsitory {
 			fmt.Println(err)
 		}
 		repos = append(repos, file)
+	}
+	if c.Providers.Kubernetes.Enabled {
+		kube := c.Providers.Kubernetes.Config.Build()
+		repos = append(repos, kube)
 	}
 	return openapi.AllOf(repos...)
 }
