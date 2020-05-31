@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	o "github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/openapi"
 )
 
 type fileRepsitory struct {
@@ -14,7 +14,8 @@ type fileRepsitory struct {
 	prefix string
 }
 
-func NewFileRepsitory(path string, prefix string) (o.Repsitory, error) {
+// NewFileRepsitory creates a new file backed repo
+func NewFileRepsitory(path string, prefix string) (openapi.Repsitory, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, err
 	}
@@ -36,7 +37,7 @@ func (r *fileRepsitory) Keys() []string {
 	return keys
 }
 
-func (r *fileRepsitory) Spec(key string) (o.Spec, error) {
+func (r *fileRepsitory) Spec(key string) (openapi.Spec, error) {
 	fileName := r.prefix + key + ".json"
 	filePath := filepath.Join(r.path, fileName)
 	return &fileSpec{filePath}, nil
@@ -46,7 +47,7 @@ type fileSpec struct {
 	path string
 }
 
-func (s *fileSpec) JsonSpec() (interface{}, error) {
+func (s *fileSpec) JSONSpec() (interface{}, error) {
 	file, err := os.Open(s.path)
 	if err != nil {
 		return nil, err

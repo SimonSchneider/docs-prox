@@ -5,18 +5,18 @@ import (
 	"os"
 	"strings"
 
-	o "github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/openapi"
 )
 
 type environmentRepository struct {
 	keys  []string
-	specs map[string]o.Spec
+	specs map[string]openapi.Spec
 }
 
-func NewEnvironmentRepsitory(prefix string) o.Repsitory {
-	// access the directory to validate access
+// NewEnvironmentRepsitory returns a new repo fetching config form env variables with a given prefix
+func NewEnvironmentRepsitory(prefix string) openapi.Repsitory {
 	keys := make([]string, 0)
-	specs := make(map[string]o.Spec)
+	specs := make(map[string]openapi.Spec)
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
 		if !strings.HasPrefix(pair[0], prefix) {
@@ -24,7 +24,7 @@ func NewEnvironmentRepsitory(prefix string) o.Repsitory {
 		}
 		key := strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(pair[0], prefix), "_", "-"))
 		keys = append(keys, key)
-		specs[key] = o.NewRemoteSpec(pair[1])
+		specs[key] = openapi.NewRemoteSpec(pair[1])
 	}
 	return &environmentRepository{keys: keys, specs: specs}
 }
@@ -33,7 +33,7 @@ func (r *environmentRepository) Keys() []string {
 	return r.keys
 }
 
-func (r *environmentRepository) Spec(key string) (o.Spec, error) {
+func (r *environmentRepository) Spec(key string) (openapi.Spec, error) {
 	if val, ok := r.specs[key]; ok {
 		return val, nil
 	}

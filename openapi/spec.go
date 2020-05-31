@@ -5,19 +5,21 @@ import (
 	"net/http"
 )
 
+// Spec is the openApi spec abstraction
 type Spec interface {
-	JsonSpec() (interface{}, error)
+	JSONSpec() (interface{}, error)
 }
 
 type staticSpec struct {
 	spec interface{}
 }
 
-func NewStaticSpec(spec interface{}) *staticSpec {
+// NewStaticSpec creates a static spec with an inmemory spec
+func NewStaticSpec(spec interface{}) Spec {
 	return &staticSpec{spec: spec}
 }
 
-func (s *staticSpec) JsonSpec() (interface{}, error) {
+func (s *staticSpec) JSONSpec() (interface{}, error) {
 	return s.spec, nil
 }
 
@@ -25,11 +27,12 @@ type remoteSpec struct {
 	url string
 }
 
-func NewRemoteSpec(url string) *remoteSpec {
+// NewRemoteSpec creates a spec that is proxied from a remote url
+func NewRemoteSpec(url string) Spec {
 	return &remoteSpec{url: url}
 }
 
-func (s *remoteSpec) JsonSpec() (interface{}, error) {
+func (s *remoteSpec) JSONSpec() (interface{}, error) {
 	resp, err := http.Get(s.url)
 	if err != nil {
 		return nil, err

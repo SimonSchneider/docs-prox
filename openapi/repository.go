@@ -4,6 +4,7 @@ import (
 	"fmt"
 )
 
+// Repsitory abstracts a documentation provider holding keys and specs
 type Repsitory interface {
 	Keys() []string
 	Spec(key string) (Spec, error)
@@ -14,7 +15,8 @@ type staticRepository struct {
 	keys  []string
 }
 
-func NewStaticRepo(specs map[string]Spec) *staticRepository {
+// NewStaticRepo creates a repo with static map of specs
+func NewStaticRepo(specs map[string]Spec) Repsitory {
 	keys := make([]string, 0, len(specs))
 	for key := range specs {
 		keys = append(keys, key)
@@ -39,6 +41,7 @@ type multiRepository struct {
 	keys       []string
 }
 
+// AllOf returns a new Repository containing all the delegates
 func AllOf(delegates ...Repsitory) Repsitory {
 	return &multiRepository{delegates: delegates}
 }
