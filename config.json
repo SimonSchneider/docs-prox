@@ -1,0 +1,19 @@
+{
+  "host": "localhost",
+  "port": 8080,
+  "providers": {
+    "environment": {
+      "enabled": true,
+      "config": {
+        "prefix": "SWAGGER_"
+      }
+    },
+    "file": {
+      "enabled": true,
+      "config": {
+        "path": "./_tmp/conf",
+        "prefix": "swagger_"
+      }
+    }
+  }
+}

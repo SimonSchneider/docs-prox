@@ -8,25 +8,30 @@ import (
 	"github.com/SimonSchneider/docs-prox/openapi"
 )
 
-type environmentRepository struct {
-	keys  []string
-	specs map[string]openapi.Spec
+// Config of the environment repository
+type Config struct {
+	Prefix string `json:"prefix"`
 }
 
-// NewEnvironmentRepsitory returns a new repo fetching config form env variables with a given prefix
-func NewEnvironmentRepsitory(prefix string) openapi.Repsitory {
+// Build the repository from the configuration
+func (c *Config) Build() openapi.Repsitory {
 	keys := make([]string, 0)
 	specs := make(map[string]openapi.Spec)
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
-		if !strings.HasPrefix(pair[0], prefix) {
+		if !strings.HasPrefix(pair[0], c.Prefix) {
 			continue
 		}
-		key := strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(pair[0], prefix), "_", "-"))
+		key := strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(pair[0], c.Prefix), "_", "-"))
 		keys = append(keys, key)
 		specs[key] = openapi.NewRemoteSpec(pair[1])
 	}
 	return &environmentRepository{keys: keys, specs: specs}
+}
+
+type environmentRepository struct {
+	keys  []string
+	specs map[string]openapi.Spec
 }
 
 func (r *environmentRepository) Keys() []string {

@@ -9,17 +9,23 @@ import (
 	"github.com/SimonSchneider/docs-prox/openapi"
 )
 
+// Config of file repo
+type Config struct {
+	Path   string `json:"path"`
+	Prefix string `json:"prefix"`
+}
+
+// Build a repository from the config
+func (c *Config) Build() (openapi.Repsitory, error) {
+	if _, err := os.Stat(c.Path); err != nil {
+		return nil, err
+	}
+	return &fileRepsitory{path: c.Path, prefix: c.Prefix}, nil
+}
+
 type fileRepsitory struct {
 	path   string
 	prefix string
-}
-
-// NewFileRepsitory creates a new file backed repo
-func NewFileRepsitory(path string, prefix string) (openapi.Repsitory, error) {
-	if _, err := os.Stat(path); err != nil {
-		return nil, err
-	}
-	return &fileRepsitory{path: path, prefix: prefix}, nil
 }
 
 func (r *fileRepsitory) Keys() []string {
