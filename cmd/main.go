@@ -16,17 +16,17 @@ import (
 func main() {
 	config, _ := parse("config.json")
 	repo := config.buildProviders()
-	router(repo)
+	router(repo, config.Host, config.Port)
 }
 
-func router(repo openapi.Repsitory) error {
+func router(repo openapi.Repsitory, host string, port int) error {
 	r := mux.NewRouter()
 	fs := http.FileServer(http.Dir("./dist"))
 	r.Handle("/docs/", handlers.CORS()(keyHandler(repo)))
 	r.Handle("/docs/{key}", handlers.CORS()(docsHandler(repo)))
 	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", fs))
 
-	listener, err := net.Listen("tcp4", net.JoinHostPort("", strconv.Itoa(8080)))
+	listener, err := net.Listen("tcp4", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {
 		return err
 	}

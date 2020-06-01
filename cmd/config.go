@@ -13,7 +13,7 @@ import (
 
 type config struct {
 	Host      string `json:"host"`
-	Port      string `json:"port"`
+	Port      int    `json:"port"`
 	Providers struct {
 		Environment struct {
 			Enabled bool               `json:"enabled"`
