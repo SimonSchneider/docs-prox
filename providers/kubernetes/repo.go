@@ -27,7 +27,7 @@ type Config struct {
 }
 
 // Build the repository
-func (c *Config) Build() openapi.Repsitory {
+func (c *Config) Build() openapi.Repository {
 	kubeconfig := filepath.Join(
 		os.Getenv("HOME"), ".kube", "config",
 	)

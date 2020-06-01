@@ -16,19 +16,19 @@ type Config struct {
 }
 
 // Build a repository from the config
-func (c *Config) Build() (openapi.Repsitory, error) {
+func (c *Config) Build() (openapi.Repository, error) {
 	if _, err := os.Stat(c.Path); err != nil {
 		return nil, err
 	}
-	return &fileRepsitory{path: c.Path, prefix: c.Prefix}, nil
+	return &fileRepository{path: c.Path, prefix: c.Prefix}, nil
 }
 
-type fileRepsitory struct {
+type fileRepository struct {
 	path   string
 	prefix string
 }
 
-func (r *fileRepsitory) Keys() []string {
+func (r *fileRepository) Keys() []string {
 	var keys []string
 	err := filepath.Walk(r.path, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && strings.HasPrefix(info.Name(), r.prefix) && strings.HasSuffix(info.Name(), ".json") {
@@ -43,7 +43,7 @@ func (r *fileRepsitory) Keys() []string {
 	return keys
 }
 
-func (r *fileRepsitory) Spec(key string) (openapi.Spec, error) {
+func (r *fileRepository) Spec(key string) (openapi.Spec, error) {
 	fileName := r.prefix + key + ".json"
 	filePath := filepath.Join(r.path, fileName)
 	return &fileSpec{filePath}, nil

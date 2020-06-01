@@ -41,7 +41,7 @@ func parse(path string) (*config, error) {
 	return &c, err
 }
 
-func (c *config) buildProviders() openapi.Repsitory {
+func (c *config) buildProviders() openapi.Repository {
 	cachedSpec1 := openapi.NewStaticSpec("{\"hi\":\"hello\"}")
 	cachedSpec2 := openapi.NewStaticSpec("{\"hi\":\"hello from 2\"}")
 	cachedSpec3 := openapi.NewStaticSpec("{\"hi\":\"hello from 3\"}")
@@ -49,7 +49,7 @@ func (c *config) buildProviders() openapi.Repsitory {
 	remoteSpec1 := openapi.NewRemoteSpec("https://petstore.swagger.io/v2/swagger.json")
 	remoteRepo := openapi.NewStaticRepo(map[string]openapi.Spec{"remoteSpec1": remoteSpec1})
 	staticRepo2 := openapi.NewStaticRepo(map[string]openapi.Spec{"cachedSpec1": cachedSpec1, "cachedSpec3": cachedSpec3})
-	repos := make([]openapi.Repsitory, 0)
+	repos := make([]openapi.Repository, 0)
 	repos = append(repos, staticRepo, remoteRepo, staticRepo2)
 	if c.Providers.Environment.Enabled {
 		repos = append(repos, c.Providers.Environment.Config.Build())

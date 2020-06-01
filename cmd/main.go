@@ -14,12 +14,15 @@ import (
 )
 
 func main() {
-	config, _ := parse("config.json")
+	fmt.Println("loading configuration")
+	config, _ := parse("_config/config.json")
+	fmt.Println("setting up providers")
 	repo := config.buildProviders()
+	fmt.Println("starting server")
 	router(repo, config.Host, config.Port)
 }
 
-func router(repo openapi.Repsitory, host string, port int) error {
+func router(repo openapi.Repository, host string, port int) error {
 	r := mux.NewRouter()
 	fs := http.FileServer(http.Dir("./dist"))
 	r.Handle("/docs/", handlers.CORS()(keyHandler(repo)))
@@ -42,7 +45,7 @@ func router(repo openapi.Repsitory, host string, port int) error {
 	return <-errFuture
 }
 
-func keyHandler(repo openapi.Repsitory) http.Handler {
+func keyHandler(repo openapi.Repository) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		keys := repo.Keys()
@@ -64,7 +67,7 @@ type keyUrls struct {
 	Path string `json:"path"`
 }
 
-func docsHandler(repo openapi.Repsitory) http.Handler {
+func docsHandler(repo openapi.Repository) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		rw.Header().Set("Content-Type", "application/json")

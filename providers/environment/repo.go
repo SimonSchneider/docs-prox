@@ -14,7 +14,7 @@ type Config struct {
 }
 
 // Build the repository from the configuration
-func (c *Config) Build() openapi.Repsitory {
+func (c *Config) Build() openapi.Repository {
 	keys := make([]string, 0)
 	specs := make(map[string]openapi.Spec)
 	for _, e := range os.Environ() {

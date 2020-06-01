@@ -1,0 +1,23 @@
+{
+  "host": "",
+  "port": 10021,
+  "providers": {
+    "environment": {
+      "enabled": true,
+      "config": {
+        "prefix": "SWAGGER_"
+      }
+    },
+    "file": {
+      "enabled": true,
+      "config": {
+        "path": "./_config",
+        "prefix": "swagger_"
+      }
+    },
+    "kubernetes": {
+      "enabled": false,
+      "config": {}
+    }
+  }
+}
