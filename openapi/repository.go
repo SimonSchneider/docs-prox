@@ -88,7 +88,7 @@ func (r *multiRepository) Spec(key string) (Spec, error) {
 	for _, delegate := range r.delegates {
 		go func(repo Repository) {
 			defer wg.Done()
-			getSpecAsync(ctx, delegate, key, resChan)
+			getSpecAsync(ctx, repo, key, resChan)
 		}(delegate)
 	}
 	go func() {
