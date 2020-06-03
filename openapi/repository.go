@@ -48,14 +48,60 @@ func AllOf(delegates ...Repository) Repository {
 }
 
 func (r *multiRepository) Keys() []string {
+	keySet := make(map[string]interface{})
+	keys := make([]string, 0)
+	for _, delegate := range r.delegates {
+		for _, key := range delegate.Keys() {
+			if _, ok := keySet[key]; !ok {
+				keySet[key] = nil
+				keys = append(keys, key)
+			}
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (r *multiRepository) Spec(key string) (Spec, error) {
+	for _, delegate := range r.delegates {
+		for _, k := range delegate.Keys() {
+			if k == key {
+				return delegate.Spec(k)
+			}
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
+
+type asyncMultiRepository struct {
+	delegates []Repository
+}
+
+// AsyncAllOf returns a new Repository containing all the delegates
+// and an async implementation of keys() and spec(key string)
+func AsyncAllOf(delegates ...Repository) Repository {
+	return &asyncMultiRepository{delegates: delegates}
+}
+
+func (r *asyncMultiRepository) Keys() []string {
 	keys := make(chan string)
+	ctx := context.Background()
+	r.keysAsync(ctx, keys)
+	return collectKeys(keys)
+}
+
+func (r *asyncMultiRepository) keysAsync(ctx context.Context, keys chan<- string) {
 	var wg sync.WaitGroup
 	wg.Add(len(r.delegates))
 	for _, delegate := range r.delegates {
 		go func(repo Repository) {
 			defer wg.Done()
 			for _, k := range repo.Keys() {
-				keys <- k
+				select {
+				case <-ctx.Done():
+					return
+				case keys <- k:
+				}
 			}
 		}(delegate)
 	}
@@ -63,7 +109,6 @@ func (r *multiRepository) Keys() []string {
 		wg.Wait()
 		close(keys)
 	}()
-	return collectKeys(keys)
 }
 
 func collectKeys(incoming <-chan string) []string {
@@ -79,41 +124,58 @@ func collectKeys(incoming <-chan string) []string {
 	return keys
 }
 
-func (r *multiRepository) Spec(key string) (Spec, error) {
-	resChan := make(chan result)
+func (r *asyncMultiRepository) Spec(key string) (Spec, error) {
+	spec := make(chan Spec)
+	err := make(chan error)
+	defer close(spec)
+	defer close(err)
+	ctx := context.Background()
+	r.specAsync(ctx, spec, err, key)
+	select {
+	case s := <-spec:
+		return s, nil
+	case e := <-err:
+		return nil, e
+	}
+}
+
+func (r *asyncMultiRepository) specAsync(ctx context.Context, outCh chan<- Spec, errCh chan<- error, key string) {
+	resultCh := make(chan result)
 	var wg sync.WaitGroup
+	cctx, cancel := context.WithCancel(ctx)
 	wg.Add(len(r.delegates))
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	for _, delegate := range r.delegates {
 		go func(repo Repository) {
 			defer wg.Done()
-			getSpecAsync(ctx, repo, key, resChan)
+			for _, k := range repo.Keys() {
+				select {
+				case <-cctx.Done():
+					return
+				default:
+					if k == key {
+						spec, err := repo.Spec(k)
+						resultCh <- result{spec: spec, err: err}
+					}
+				}
+			}
 		}(delegate)
 	}
 	go func() {
+		defer close(resultCh)
 		wg.Wait()
-		close(resChan)
 	}()
-	if res, ok := <-resChan; ok {
-		return res.spec, res.err
-	}
-	return nil, fmt.Errorf("not found")
-}
-
-func getSpecAsync(ctx context.Context, repo Repository, key string, res chan<- result) {
-	for _, k := range repo.Keys() {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if k == key {
-				spec, err := repo.Spec(key)
-				res <- result{spec: spec, err: err}
-				return
+	go func() {
+		defer cancel()
+		if res, ok := <-resultCh; ok {
+			if res.spec != nil {
+				outCh <- res.spec
+			} else {
+				errCh <- res.err
 			}
+		} else {
+			errCh <- fmt.Errorf("not found")
 		}
-	}
+	}()
 }
 
 type result struct {

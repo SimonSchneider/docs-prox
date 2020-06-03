@@ -27,6 +27,7 @@ var (
 	repoWithKey    = NewStaticRepo(map[string]Spec{foundKey: foundSpec})
 	duplicatedRepo = NewStaticRepo(map[string]Spec{foundKey: duplicatedSpec})
 	fullRepo       = AllOf(emptyRepo, brokenRepo, repoWithKey, duplicatedRepo)
+	// fullRepo = AsyncAllOf(emptyRepo, brokenRepo, repoWithKey, duplicatedRepo)
 )
 
 func TestKeys(t *testing.T) {
@@ -55,5 +56,17 @@ func TestOkSpec(t *testing.T) {
 	}
 	if spec != foundSpec && spec != duplicatedSpec {
 		t.Errorf("unexpected spec %s", spec)
+	}
+}
+
+func BenchmarkKeys(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		fullRepo.Keys()
+	}
+}
+
+func BenchmarkSpec(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		fullRepo.Spec(foundKey)
 	}
 }
