@@ -1,7 +1,6 @@
 package environment
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -34,13 +33,13 @@ type environmentRepository struct {
 	specs map[string]openapi.Spec
 }
 
-func (r *environmentRepository) Keys() []string {
-	return r.keys
+func (r *environmentRepository) Keys() ([]string, error) {
+	return r.keys, nil
 }
 
 func (r *environmentRepository) Spec(key string) (openapi.Spec, error) {
 	if val, ok := r.specs[key]; ok {
 		return val, nil
 	}
-	return nil, fmt.Errorf("not found")
+	return nil, openapi.KeyNotFoundError{Repo: "environmentRepository", Key: key}
 }

@@ -2,6 +2,7 @@ package file
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ type Config struct {
 // Build a repository from the config
 func (c *Config) Build() (openapi.Repository, error) {
 	if _, err := os.Stat(c.Path); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fileRepository: could not access path %s: %w", c.Path, err)
 	}
 	return &fileRepository{path: c.Path, prefix: c.Prefix}, nil
 }
@@ -28,7 +29,7 @@ type fileRepository struct {
 	prefix string
 }
 
-func (r *fileRepository) Keys() []string {
+func (r *fileRepository) Keys() ([]string, error) {
 	var keys []string
 	err := filepath.Walk(r.path, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && strings.HasPrefix(info.Name(), r.prefix) && strings.HasSuffix(info.Name(), ".json") {
@@ -38,9 +39,9 @@ func (r *fileRepository) Keys() []string {
 		return nil
 	})
 	if err != nil {
-		return []string{}
+		return []string{}, err
 	}
-	return keys
+	return keys, nil
 }
 
 func (r *fileRepository) Spec(key string) (openapi.Spec, error) {

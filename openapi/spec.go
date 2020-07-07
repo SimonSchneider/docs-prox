@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -24,18 +25,19 @@ func (s *staticSpec) JSONSpec() (interface{}, error) {
 }
 
 type remoteSpec struct {
-	url string
+	client *http.Client
+	url    string
 }
 
 // NewRemoteSpec creates a spec that is proxied from a remote url
 func NewRemoteSpec(url string) Spec {
-	return &remoteSpec{url: url}
+	return &remoteSpec{client: &http.Client{}, url: url}
 }
 
 func (s *remoteSpec) JSONSpec() (interface{}, error) {
-	resp, err := http.Get(s.url)
+	resp, err := s.client.Get(s.url)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("remoteSpec: unable to fetch spec from %s: %w", s.url, err)
 	}
 	var result interface{}
 	defer resp.Body.Close()

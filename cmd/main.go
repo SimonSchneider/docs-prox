@@ -48,7 +48,10 @@ func router(repo openapi.Repository, host string, port int) error {
 func keyHandler(repo openapi.Repository) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
-		keys := repo.Keys()
+		keys, err := repo.Keys()
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+		}
 		prep := make([]keyUrls, 0, len(keys))
 		for _, k := range keys {
 			prep = append(prep, keyUrls{Name: k, Path: r.URL.Path + k})

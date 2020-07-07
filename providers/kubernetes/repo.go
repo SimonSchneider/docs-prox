@@ -48,7 +48,7 @@ type kubernetesRepo struct {
 	remoteConfigMaps sync.Map
 }
 
-func (r *kubernetesRepo) Keys() []string {
+func (r *kubernetesRepo) Keys() ([]string, error) {
 	keys := make([]string, 0)
 	r.services.Range(func(key interface{}, val interface{}) bool {
 		keys = append(keys, key.(string))
@@ -60,7 +60,7 @@ func (r *kubernetesRepo) Keys() []string {
 		}
 		return true
 	})
-	return keys
+	return keys, nil
 }
 
 func (r *kubernetesRepo) Spec(key string) (openapi.Spec, error) {

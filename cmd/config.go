@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/SimonSchneider/docs-prox/providers/static"
+
 	"github.com/SimonSchneider/docs-prox/openapi"
 	"github.com/SimonSchneider/docs-prox/providers/environment"
 	"github.com/SimonSchneider/docs-prox/providers/file"
@@ -42,13 +44,13 @@ func parse(path string) (*config, error) {
 }
 
 func (c *config) buildProviders() openapi.Repository {
-	cachedSpec1 := openapi.NewStaticSpec("{\"hi\":\"hello\"}")
-	cachedSpec2 := openapi.NewStaticSpec("{\"hi\":\"hello from 2\"}")
-	cachedSpec3 := openapi.NewStaticSpec("{\"hi\":\"hello from 3\"}")
-	staticRepo := openapi.NewStaticRepo(map[string]openapi.Spec{"cachedSpec1": cachedSpec1, "cachedSpec2": cachedSpec2})
+	cachedSpec1 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello\"}"))
+	cachedSpec2 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello from 2\"}"))
+	cachedSpec3 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello from 3\"}"))
+	staticRepo := static.NewStaticRepo(map[string]openapi.Spec{"cachedSpec1": cachedSpec1, "cachedSpec2": cachedSpec2})
 	remoteSpec1 := openapi.NewRemoteSpec("https://petstore.swagger.io/v2/swagger.json")
-	remoteRepo := openapi.NewStaticRepo(map[string]openapi.Spec{"remoteSpec1": remoteSpec1})
-	staticRepo2 := openapi.NewStaticRepo(map[string]openapi.Spec{"cachedSpec1": cachedSpec1, "cachedSpec3": cachedSpec3})
+	remoteRepo := static.NewStaticRepo(map[string]openapi.Spec{"remoteSpec1": remoteSpec1})
+	staticRepo2 := static.NewStaticRepo(map[string]openapi.Spec{"cachedSpec1": cachedSpec1, "cachedSpec3": cachedSpec3})
 	repos := make([]openapi.Repository, 0)
 	repos = append(repos, staticRepo, remoteRepo, staticRepo2)
 	if c.Providers.Environment.Enabled {
@@ -66,4 +68,10 @@ func (c *config) buildProviders() openapi.Repository {
 		repos = append(repos, kube)
 	}
 	return openapi.AllOf(repos...)
+}
+
+func parseString(str string) interface{} {
+	var res interface{}
+	json.Unmarshal([]byte(str), &res)
+	return res
 }
