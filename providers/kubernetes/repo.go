@@ -7,7 +7,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
+
+	v12 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"github.com/SimonSchneider/docs-prox/openapi"
 	v1 "k8s.io/api/core/v1"
@@ -22,97 +23,71 @@ var (
 	template = "%-32s%-8s\n"
 )
 
-// Config for kubernetes
-type Config struct {
-}
-
 // Build the repository
-func (c *Config) Build() openapi.Repository {
+func Configure(ctx context.Context, store openapi.ApiStore) error {
 	kubeconfig := filepath.Join(
 		os.Getenv("HOME"), ".kube", "config",
 	)
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	clientset, err := kubernetes.NewForConfig(config)
+	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	repo := &kubernetesRepo{services: sync.Map{}, remoteConfigMaps: sync.Map{}}
-	fmt.Println("setting up kube")
-	go repo.watchServices(clientset)
-	go repo.watchRemoteConfigMaps(clientset)
-	return repo
+	api := clientSet.CoreV1()
+	repo := &kubernetesRepo{api: api, watchers: make([]watch.Interface, 0), store: store}
+	return repo.Start(ctx)
 }
 
 type kubernetesRepo struct {
-	services         sync.Map
-	remoteConfigMaps sync.Map
+	api      v12.CoreV1Interface
+	watchers []watch.Interface
+	store    openapi.ApiStore
 }
 
-func (r *kubernetesRepo) Keys() ([]string, error) {
-	keys := make([]string, 0)
-	r.services.Range(func(key interface{}, val interface{}) bool {
-		keys = append(keys, key.(string))
-		return true
-	})
-	r.remoteConfigMaps.Range(func(key interface{}, val interface{}) bool {
-		for k := range val.(map[string]string) {
-			keys = append(keys, k)
+type WatcherBuilder func(ctx context.Context) error
+
+func (r *kubernetesRepo) Start(ctx context.Context) error {
+	for _, builder := range []WatcherBuilder{r.startSvcWatcher, r.startRemoteCMWatcher} {
+		err := builder(ctx)
+		if err != nil {
+			return err
 		}
-		return true
-	})
-	return keys, nil
+	}
+	return nil
 }
 
-func (r *kubernetesRepo) Spec(key string) (openapi.Spec, error) {
-	if url, ok := r.services.Load(key); ok {
-		return openapi.NewRemoteSpec(url.(string)), nil
-	}
-	var spec openapi.Spec
-	r.remoteConfigMaps.Range(func(k interface{}, v interface{}) bool {
-		values := v.(map[string]string)
-		if url, ok := values[key]; ok {
-			spec = openapi.NewRemoteSpec(url)
-			return false
-		}
-		return true
-	})
-	if spec != nil {
-		return spec, nil
-	}
-	return nil, fmt.Errorf("no such key")
-}
-
-func (r *kubernetesRepo) watchServices(clientset *kubernetes.Clientset) {
-	api := clientset.CoreV1()
+func (r *kubernetesRepo) startSvcWatcher(ctx context.Context) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: "swagger",
 	}
-	watcher, err := api.Services("").Watch(context.TODO(), listOptions)
+	watcher, err := r.api.Services("").Watch(ctx, listOptions)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	ch := watcher.ResultChan()
-	for event := range ch {
-		svc, ok := event.Object.(*v1.Service)
-		if !ok {
-			log.Fatal("unexpected type")
+	go func() {
+		for event := range watcher.ResultChan() {
+			svc, ok := event.Object.(*v1.Service)
+			if !ok {
+				log.Printf("ignoring unknown event type %v\n", event)
+				continue
+			}
+			switch event.Type {
+			case watch.Deleted:
+				r.deleteSvc(svc)
+			case watch.Added, watch.Modified:
+				r.addSvc(svc)
+			}
 		}
-		fmt.Println("handling event")
-		switch event.Type {
-		case watch.Deleted:
-			r.deleteService(svc)
-		default:
-			r.addService(svc)
-		}
-	}
+	}()
+	return nil
 }
 
-func (r *kubernetesRepo) addService(svc *v1.Service) {
+func (r *kubernetesRepo) addSvc(svc *v1.Service) {
 	var ok bool
 	var path, port string
 	if path, ok = svc.Annotations["swagger"]; !ok {
 		fmt.Println("path cant be empty")
-		r.deleteService(svc)
+		r.deleteSvc(svc)
 		return
 	}
 	if port, ok = svc.Labels["swagger-port"]; !ok {
@@ -122,54 +97,60 @@ func (r *kubernetesRepo) addService(svc *v1.Service) {
 			port = fmt.Sprint(ports[0].Port)
 		} else {
 			fmt.Println("no default port found")
-			r.deleteService(svc)
+			r.deleteSvc(svc)
 			return
 		}
 	}
 	url := "http://" + svc.Name + ":" + port + path
 	fmt.Printf("storing %s - %s\n", svc.Name, url)
-	r.services.Store(svc.Name, url)
+	r.store.Put("kubesvc", svc.Name, openapi.NewRemoteSpec(url))
 }
 
-func (r *kubernetesRepo) deleteService(svc *v1.Service) {
-	r.services.Delete(svc.Name)
+func (r *kubernetesRepo) deleteSvc(svc *v1.Service) {
+	r.store.Remove("kubesvc", svc.Name)
 	fmt.Printf("service deleted %s\n", svc.Name)
 }
 
-func (r *kubernetesRepo) watchRemoteConfigMaps(clientset *kubernetes.Clientset) {
-	api := clientset.CoreV1()
+func (r *kubernetesRepo) startRemoteCMWatcher(ctx context.Context) error {
 	listOptions := metav1.ListOptions{
 		LabelSelector: "remote-swagger",
 	}
-	watcher, err := api.ConfigMaps("").Watch(context.TODO(), listOptions)
+	watcher, err := r.api.ConfigMaps("").Watch(ctx, listOptions)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	ch := watcher.ResultChan()
-	for event := range ch {
-		svc, ok := event.Object.(*v1.ConfigMap)
-		if !ok {
-			log.Fatal("unexpected type")
+	go func() {
+		for event := range watcher.ResultChan() {
+			svc, ok := event.Object.(*v1.ConfigMap)
+			if !ok {
+				log.Printf("ignoring unknown event type %v\n", event)
+				continue
+			}
+			switch event.Type {
+			case watch.Deleted:
+				r.deleteRemoteCM(svc)
+			default:
+				r.addRemoteCM(svc)
+			}
 		}
-		fmt.Println("handling event")
-		switch event.Type {
-		case watch.Deleted:
-			r.deleteRemoteConfigMap(svc)
-		default:
-			r.addRemoteConfigMap(svc)
-		}
-	}
+	}()
+	return nil
 }
 
-func (r *kubernetesRepo) addRemoteConfigMap(cm *v1.ConfigMap) {
-	data := make(map[string]string)
+func (r *kubernetesRepo) addRemoteCM(cm *v1.ConfigMap) {
+	data := make(map[string]openapi.Spec)
+	source := sourceOfCM(cm)
 	for key, val := range cm.Data {
-		data[key] = val
+		data[key] = openapi.NewRemoteSpec(val)
 	}
-	r.remoteConfigMaps.Store(cm.Name, data)
+	r.store.ReplaceAllOf(source, data)
 }
 
-func (r *kubernetesRepo) deleteRemoteConfigMap(cm *v1.ConfigMap) {
-	r.remoteConfigMaps.Delete(cm.Name)
+func (r *kubernetesRepo) deleteRemoteCM(cm *v1.ConfigMap) {
+	r.store.RemoveAllOf(sourceOfCM(cm))
 	fmt.Printf("remoteConfigMap deleted %s\n", cm.Name)
+}
+
+func sourceOfCM(c *v1.ConfigMap) string {
+	return fmt.Sprintf("kubec:cm:%s", c.Name)
 }

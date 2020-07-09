@@ -1,6 +1,7 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,47 +9,8 @@ import (
 	"strings"
 
 	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/fsnotify/fsnotify"
 )
-
-// Config of file repo
-type Config struct {
-	Path   string `json:"path"`
-	Prefix string `json:"prefix"`
-}
-
-// Build a repository from the config
-func (c *Config) Build() (openapi.Repository, error) {
-	if _, err := os.Stat(c.Path); err != nil {
-		return nil, fmt.Errorf("fileRepository: could not access path %s: %w", c.Path, err)
-	}
-	return &fileRepository{path: c.Path, prefix: c.Prefix}, nil
-}
-
-type fileRepository struct {
-	path   string
-	prefix string
-}
-
-func (r *fileRepository) Keys() ([]string, error) {
-	var keys []string
-	err := filepath.Walk(r.path, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() && strings.HasPrefix(info.Name(), r.prefix) && strings.HasSuffix(info.Name(), ".json") {
-			key := strings.TrimSuffix(strings.TrimPrefix(info.Name(), r.prefix), ".json")
-			keys = append(keys, key)
-		}
-		return nil
-	})
-	if err != nil {
-		return []string{}, err
-	}
-	return keys, nil
-}
-
-func (r *fileRepository) Spec(key string) (openapi.Spec, error) {
-	fileName := r.prefix + key + ".json"
-	filePath := filepath.Join(r.path, fileName)
-	return &fileSpec{filePath}, nil
-}
 
 type fileSpec struct {
 	path string
@@ -63,4 +25,98 @@ func (s *fileSpec) JSONSpec() (interface{}, error) {
 	defer file.Close()
 	err = json.NewDecoder(file).Decode(&result)
 	return result, err
+}
+
+// Configure the store to add the path for json files with prefix
+func Configure(ctx context.Context, store openapi.ApiStore, path, prefix string) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("fileRepository: unable to start filewatcher: %w", err)
+	}
+	dirWatcher := &dirWatcher{
+		source:  fmt.Sprintf("dirWatcher-%s", path),
+		prefix:  prefix,
+		watcher: watcher,
+		store:   store,
+	}
+	go func() {
+		<-ctx.Done()
+		fmt.Printf("stopping directory watcher\n")
+		watcher.Close()
+	}()
+	go dirWatcher.start(ctx)
+	return dirWatcher.add(path)
+}
+
+type dirWatcher struct {
+	source  string
+	prefix  string
+	watcher *fsnotify.Watcher
+	store   openapi.ApiStore
+}
+
+type ChangeType int32
+
+const (
+	add ChangeType = iota
+	remove
+)
+
+func (d *dirWatcher) add(path string) error {
+	err := d.watcher.Add(path)
+	if err != nil {
+		return fmt.Errorf("fileRepository: could not access path %s: %w", path, err)
+	}
+	err = filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		d.change(p, add)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("fileRepository: could not walk path %s: %w", path, err)
+	}
+	return nil
+}
+
+func (d *dirWatcher) start(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Printf("stopping directory processor\n")
+			return
+		case event, ok := <-d.watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Remove == fsnotify.Remove || event.Op&fsnotify.Rename == fsnotify.Rename {
+				d.change(event.Name, remove)
+			} else if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+				d.change(event.Name, add)
+			}
+		case err, ok := <-d.watcher.Errors:
+			if !ok {
+				return
+			}
+			fmt.Println("error:", err)
+		}
+	}
+}
+
+func (d *dirWatcher) change(path string, cType ChangeType) {
+	if key, ok := d.getKey(path); ok {
+		switch cType {
+		case add:
+			d.store.Put(d.source, key, &fileSpec{path})
+		case remove:
+			d.store.Remove(d.source, key)
+		}
+	}
+}
+
+func (d *dirWatcher) getKey(path string) (string, bool) {
+	fileName := filepath.Base(path)
+	if strings.HasPrefix(fileName, d.prefix) && filepath.Ext(fileName) == ".json" {
+		key := strings.TrimSuffix(strings.TrimPrefix(fileName, d.prefix), ".json")
+		return key, true
+	}
+	return "", false
 }

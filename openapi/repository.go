@@ -3,11 +3,12 @@ package openapi
 import (
 	"fmt"
 	"sort"
+	"sync"
 )
 
 // Repository abstracts a documentation provider holding keys and specs
 type Repository interface {
-	Keys() ([]string, error)
+	Keys() []string
 	Spec(key string) (Spec, error)
 }
 
@@ -20,47 +21,99 @@ func (e KeyNotFoundError) Error() string {
 	return fmt.Sprintf("%s: Key %s not found", e.Repo, e.Key)
 }
 
-type multiRepository struct {
-	delegates []Repository
+type sortedRepo struct {
+	delegate Repository
 }
 
-// AllOf returns a new Repository containing all the delegates
-func AllOf(delegates ...Repository) Repository {
-	return &multiRepository{delegates: delegates}
+func Sorted(repository Repository) Repository {
+	return &sortedRepo{delegate: repository}
 }
 
-func (r *multiRepository) Keys() ([]string, error) {
-	keySet := make(map[string]interface{})
-	keys := make([]string, 0)
-	for _, delegate := range r.delegates {
-		dKeys, err := delegate.Keys()
-		if err != nil {
-			fmt.Printf("error collecting keys, ignoring repository: %v\n", err)
-			continue
-		}
-		for _, key := range dKeys {
-			if _, ok := keySet[key]; !ok {
-				keySet[key] = nil
-				keys = append(keys, key)
-			}
-		}
-	}
+func (s *sortedRepo) Keys() []string {
+	keys := s.delegate.Keys()
 	sort.Strings(keys)
-	return keys, nil
+	return keys
 }
 
-func (r *multiRepository) Spec(key string) (Spec, error) {
-	for _, delegate := range r.delegates {
-		keys, err := delegate.Keys()
-		if err != nil {
-			fmt.Printf("error collecting keys, ignoring repository: %v\n", err)
-			continue
-		}
-		for _, k := range keys {
-			if k == key {
-				return delegate.Spec(k)
-			}
-		}
+func (s *sortedRepo) Spec(key string) (Spec, error) {
+	return s.delegate.Spec(key)
+}
+
+type ApiStore interface {
+	Put(source, key string, spec Spec)
+	ReplaceAllOf(source string, specs map[string]Spec)
+	Remove(source, key string)
+	RemoveAllOf(source string)
+}
+
+type CachedRepository struct {
+	mu      *sync.RWMutex
+	sources map[string]map[string]struct{}
+	specs   map[string]Spec
+}
+
+func NewCachedRepository() *CachedRepository {
+	return &CachedRepository{
+		mu:      &sync.RWMutex{},
+		sources: make(map[string]map[string]struct{}),
+		specs:   make(map[string]Spec),
 	}
-	return nil, KeyNotFoundError{Repo: "multiRepository", Key: key}
+}
+
+func (r *CachedRepository) Keys() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	keys := make([]string, 0, len(r.specs))
+	for key := range r.specs {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func (r *CachedRepository) Spec(key string) (Spec, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if spec, ok := r.specs[key]; ok {
+		return spec, nil
+	}
+	return nil, KeyNotFoundError{Repo: "cachedRepo", Key: key}
+}
+
+func (r *CachedRepository) Put(source, key string, spec Spec) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.sources[source]; !ok {
+		r.sources[source] = make(map[string]struct{})
+	}
+	r.sources[source][key] = struct{}{}
+	r.specs[key] = spec
+}
+
+func (r *CachedRepository) ReplaceAllOf(source string, specs map[string]Spec) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key := range r.sources[source] {
+		delete(r.specs, key)
+	}
+	r.sources[source] = make(map[string]struct{}, len(specs))
+	for key, spec := range specs {
+		r.sources[source][key] = struct{}{}
+		r.specs[key] = spec
+	}
+}
+
+func (r *CachedRepository) Remove(source, key string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.sources[source], key)
+	delete(r.specs, key)
+}
+
+func (r *CachedRepository) RemoveAllOf(source string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key := range r.sources[source] {
+		delete(r.specs, key)
+	}
+	delete(r.sources, source)
 }
