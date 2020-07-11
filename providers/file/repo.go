@@ -28,7 +28,7 @@ func (s *fileSpec) JSONSpec() (interface{}, error) {
 }
 
 // Configure the store to add the path for json files with prefix
-func Configure(ctx context.Context, store openapi.ApiStore, path, prefix string) error {
+func Configure(ctx context.Context, store openapi.SpecStore, path, prefix string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("fileRepository: unable to start filewatcher: %w", err)
@@ -56,13 +56,13 @@ type dirWatcher struct {
 	source  string
 	prefix  string
 	watcher *fsnotify.Watcher
-	store   openapi.ApiStore
+	store   openapi.SpecStore
 }
 
-type ChangeType int32
+type changeType int32
 
 const (
-	add ChangeType = iota
+	add changeType = iota
 	remove
 )
 
@@ -105,7 +105,7 @@ func (d *dirWatcher) start(ctx context.Context) {
 	}
 }
 
-func (d *dirWatcher) change(path string, cType ChangeType) {
+func (d *dirWatcher) change(path string, cType changeType) {
 	if key, ok := d.getKey(path); ok {
 		switch cType {
 		case add:

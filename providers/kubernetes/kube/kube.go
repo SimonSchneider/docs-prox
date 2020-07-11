@@ -22,8 +22,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
+// EventType that was seen
 type EventType int32
 
+// EventTypes for different events
 const (
 	Added EventType = iota
 	Modified
@@ -32,15 +34,18 @@ const (
 	Error
 )
 
+// ListOptions filters watchers
 type ListOptions struct {
 	Namespace     string
 	LabelSelector string
 }
 
+// Client is a wrapper of the kubernetes API
 type Client struct {
 	api v12.CoreV1Interface
 }
 
+// NewKubeClient creates a new Client and tries to authenticate with kubernetes
 func NewKubeClient() (*Client, error) {
 	kubeConfig := filepath.Join(
 		os.Getenv("HOME"), ".kube", "config",
@@ -54,6 +59,7 @@ func NewKubeClient() (*Client, error) {
 	return &Client{api: api}, nil
 }
 
+// Service represents a kubernetes service
 type Service struct {
 	Name   string
 	Labels map[string]string
@@ -70,6 +76,7 @@ func toService(svc *v1.Service) *Service {
 	return &Service{Name: svc.Name, Labels: merge(svc.Labels, svc.Annotations), Ports: ports, Host: host}
 }
 
+// WatchService watch changes of services
 func (k *Client) WatchService(ctx context.Context, opts ListOptions, watcherFunc func(*Service, EventType)) error {
 	return watchAny(ctx, k.api.Services(opts.Namespace), opts, func(object runtime.Object, eventType EventType) {
 		if svc, ok := object.(*v1.Service); ok {
@@ -78,6 +85,7 @@ func (k *Client) WatchService(ctx context.Context, opts ListOptions, watcherFunc
 	})
 }
 
+// ConfigMap represents a kubernetes configMap
 type ConfigMap struct {
 	Name string
 	Data map[string]string
@@ -90,6 +98,7 @@ func toConfigMap(cm *v1.ConfigMap) *ConfigMap {
 	}
 }
 
+// WatchConfigMap watch changes of ConfigMaps
 func (k *Client) WatchConfigMap(ctx context.Context, opts ListOptions, watcherFunc func(*ConfigMap, EventType)) error {
 	return watchAny(ctx, k.api.ConfigMaps(opts.Namespace), opts, func(object runtime.Object, eventType EventType) {
 		if cm, ok := object.(*v1.ConfigMap); ok {
@@ -98,11 +107,11 @@ func (k *Client) WatchConfigMap(ctx context.Context, opts ListOptions, watcherFu
 	})
 }
 
-type Watchable interface {
+type watchable interface {
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 }
 
-func watchAny(ctx context.Context, watchable Watchable, opts ListOptions, watcherFunc func(object runtime.Object, eventType EventType)) error {
+func watchAny(ctx context.Context, watchable watchable, opts ListOptions, watcherFunc func(object runtime.Object, eventType EventType)) error {
 	watcher, err := watchable.Watch(ctx, toListOpts(opts))
 	if err != nil {
 		return err

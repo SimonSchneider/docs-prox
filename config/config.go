@@ -13,37 +13,27 @@ import (
 	"github.com/SimonSchneider/docs-prox/providers/kubernetes"
 )
 
+// Config is the json config file struct
 type Config struct {
-	Host      string        `json:"host"`
-	Port      int           `json:"port"`
-	Providers ProvidersConf `json:"providers"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+	Providers struct {
+		Environment struct {
+			Enabled bool   `json:"enabled"`
+			Prefix  string `json:"prefix"`
+		} `json:"environment"`
+		File struct {
+			Enabled bool   `json:"enabled"`
+			Path    string `json:"path"`
+			Prefix  string `json:"prefix"`
+		} `json:"file"`
+		Kubernetes struct {
+			Enabled bool `json:"enabled"`
+		} `json:"kubernetes"`
+	} `json:"providers"`
 }
 
-type ProvidersConf struct {
-	Environment EnvironmentConf `json:"environment"`
-	File        FileConf        `json:"file"`
-	Kubernetes  KubernetesConf  `json:"kubernetes"`
-}
-
-type ProviderConf struct {
-	Enabled bool `json:"enabled"`
-}
-
-type EnvironmentConf struct {
-	ProviderConf
-	Prefix string `json:"prefix"`
-}
-
-type FileConf struct {
-	ProviderConf
-	Path   string `json:"path"`
-	Prefix string `json:"prefix"`
-}
-
-type KubernetesConf struct {
-	ProviderConf
-}
-
+// ReadAndParseFile creates a config from a given filepath
 func ReadAndParseFile(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -53,13 +43,15 @@ func ReadAndParseFile(path string) (*Config, error) {
 	return Parse(file)
 }
 
+// Parse creates a config from a io.Reader
 func Parse(r io.Reader) (*Config, error) {
 	var c Config
 	err := json.NewDecoder(r).Decode(&c)
 	return &c, err
 }
 
-func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.ApiStore, error) {
+// BuildRepo builds a repo and APIStore
+func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.SpecStore, error) {
 	cachedRepo := openapi.NewCachedRepository()
 	apiStore := openapi.Logging(cachedRepo)
 	if conf := c.Providers.Environment; conf.Enabled {

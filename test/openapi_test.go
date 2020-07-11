@@ -23,7 +23,7 @@ import (
 )
 
 func TestCombiningDifferentProviders(t *testing.T) {
-	httpSpecServer := runHttpSpecServer()
+	httpSpecServer := runHTTPSpecServer()
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestCombiningDifferentProviders(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client, err := runOpenApiServer(test.config)
+			client, err := runOpenAPIServer(test.config)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -83,7 +83,7 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 	}
 	defer fileSpecServer.Close()
 	fileSpecServer.Add("swagger-found-file-1.json")
-	client, err := runOpenApiServer(TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix})
+	client, err := runOpenAPIServer(TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 	}
 }
 
-func runOpenApiServer(tmplConfig TmplConfig) (*testClient, error) {
+func runOpenAPIServer(tmplConfig TmplConfig) (*testClient, error) {
 	testConfig, err := newTestConfig()
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func validate(client *testClient, numKeys int, server SpecServer) error {
 		return err
 	}
 	if len(keys) != numKeys {
-		return fmt.Errorf("got an unexpected number of keys %d, %v\n", len(keys), keys)
+		return fmt.Errorf("got an unexpected number of keys %d: %v", len(keys), keys)
 	}
 	for _, key := range keys {
 		spec, err := client.getSpec(key.Path)
@@ -151,10 +151,10 @@ func validate(client *testClient, numKeys int, server SpecServer) error {
 		}
 		if servedSpec, ok := server.Get(key.Name); ok {
 			if spec.ID != servedSpec.ID {
-				return fmt.Errorf("got incorrect spec for %s\n", key.Name)
+				return fmt.Errorf("got incorrect spec for %s", key.Name)
 			}
 		} else {
-			return fmt.Errorf("got key that is not being served\n")
+			return fmt.Errorf("got key that is not being served")
 		}
 	}
 	return nil
@@ -231,7 +231,7 @@ type httpSpecServer struct {
 	responses map[string]SpecResp
 }
 
-func runHttpSpecServer() *httpSpecServer {
+func runHTTPSpecServer() *httpSpecServer {
 	var addr = "localhost:30000"
 	server := &httpSpecServer{
 		addr:      fmt.Sprintf("http://%s", addr),

@@ -13,10 +13,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// Serve starts a server that serves the repo
 func Serve(ctx context.Context, repo Repository, host string, port int) (net.Listener, <-chan error) {
 	r := mux.NewRouter()
 	fs := http.FileServer(http.Dir("./dist"))
-	for _, fun := range []RepoHandlerFunc{keyHandler, docsHandler} {
+	for _, fun := range []repoHandlerFunc{keyHandler, docsHandler} {
 		path, handler := fun(repo)
 		r.Handle(fmt.Sprintf("/docs%s", path), handler)
 	}
@@ -46,7 +47,7 @@ func Serve(ctx context.Context, repo Repository, host string, port int) (net.Lis
 	return listener, errFuture
 }
 
-type RepoHandlerFunc func(repository Repository) (string, http.Handler)
+type repoHandlerFunc func(repository Repository) (string, http.Handler)
 
 func keyHandler(repo Repository) (string, http.Handler) {
 	return "/", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -63,6 +64,7 @@ func keyHandler(repo Repository) (string, http.Handler) {
 	})
 }
 
+// KeyUrls is returned in the Keys endpoint
 type KeyUrls struct {
 	Name string `json:"name"`
 	Path string `json:"path"`

@@ -14,8 +14,8 @@ const (
 	serviceSource = "kubeService"
 )
 
-// Build the repository
-func Configure(ctx context.Context, store openapi.ApiStore) error {
+// Configure the SpecStore
+func Configure(ctx context.Context, store openapi.SpecStore) error {
 	api, err := kube.NewKubeClient()
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func Configure(ctx context.Context, store openapi.ApiStore) error {
 
 type kubeWatcher struct {
 	client *kube.Client
-	store  openapi.ApiStore
+	store  openapi.SpecStore
 }
 
 func (r *kubeWatcher) start(ctx context.Context) error {

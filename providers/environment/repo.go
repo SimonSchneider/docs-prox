@@ -8,7 +8,7 @@ import (
 )
 
 // Configure the repository from the configuration
-func Configure(store openapi.ApiStore, prefix string) {
+func Configure(store openapi.SpecStore, prefix string) {
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
 		if strings.HasPrefix(pair[0], prefix) {
