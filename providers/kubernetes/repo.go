@@ -30,14 +30,12 @@ type kubeWatcher struct {
 }
 
 func (r *kubeWatcher) start(ctx context.Context) error {
-	withCancel, cancel := context.WithCancel(ctx)
 	builders := []func(context.Context) error{
 		r.startSvcWatcher, r.startRemoteCMWatcher,
 	}
 	for _, builder := range builders {
-		err := builder(withCancel)
+		err := builder(ctx)
 		if err != nil {
-			cancel()
 			return err
 		}
 	}

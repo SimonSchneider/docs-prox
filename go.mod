@@ -6,6 +6,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
+	golang.org/x/net v0.0.0-20200625001655-4c5254603344 // indirect
 	golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae // indirect
 	k8s.io/api v0.18.3
 	k8s.io/apimachinery v0.18.3

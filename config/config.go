@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 
 	"github.com/SimonSchneider/docs-prox/providers/environment"
@@ -13,83 +14,68 @@ import (
 )
 
 type Config struct {
-	Host      string `json:"host"`
-	Port      int    `json:"port"`
-	Providers struct {
-		Environment struct {
-			Enabled bool `json:"enabled"`
-			Config  struct {
-				Prefix string `json:"prefix"`
-			} `json:"config"`
-		} `json:"environment"`
-		File struct {
-			Enabled bool `json:"enabled"`
-			Config  struct {
-				Path   string `json:"path"`
-				Prefix string `json:"prefix"`
-			} `json:"config"`
-		} `json:"file"`
-		Kubernetes struct {
-			Enabled bool `json:"enabled"`
-		} `json:"kubernetes"`
-	}
+	Host      string        `json:"host"`
+	Port      int           `json:"port"`
+	Providers ProvidersConf `json:"providers"`
 }
 
-func Parse(path string) (*Config, error) {
+type ProvidersConf struct {
+	Environment EnvironmentConf `json:"environment"`
+	File        FileConf        `json:"file"`
+	Kubernetes  KubernetesConf  `json:"kubernetes"`
+}
+
+type ProviderConf struct {
+	Enabled bool `json:"enabled"`
+}
+
+type EnvironmentConf struct {
+	ProviderConf
+	Prefix string `json:"prefix"`
+}
+
+type FileConf struct {
+	ProviderConf
+	Path   string `json:"path"`
+	Prefix string `json:"prefix"`
+}
+
+type KubernetesConf struct {
+	ProviderConf
+}
+
+func ReadAndParseFile(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	var c Config
 	defer file.Close()
-	err = json.NewDecoder(file).Decode(&c)
+	return Parse(file)
+}
+
+func Parse(r io.Reader) (*Config, error) {
+	var c Config
+	err := json.NewDecoder(r).Decode(&c)
 	return &c, err
 }
 
 func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.ApiStore, error) {
 	cachedRepo := openapi.NewCachedRepository()
-	staticSpecs := map[string]string{
-		"cachedSpec1": "{\"hi\":\"hello\"}",
-		"cachedSpec2": "{\"hi\":\"hello from 2\"}",
-		"cachedSpec3": "{\"hi\":\"hello from 3\"}",
+	apiStore := openapi.Logging(cachedRepo)
+	if conf := c.Providers.Environment; conf.Enabled {
+		environment.Configure(apiStore, conf.Prefix)
 	}
-	for n, v := range staticSpecs {
-		spec, err := staticSpec(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		cachedRepo.Put("cached", n, spec)
-	}
-	cachedRepo.Put("cached", "remoteSpec1", openapi.NewRemoteSpec("https://petstore.swagger.io/v2/swagger.json"))
-	if c.Providers.Environment.Enabled {
-		environment.Configure(cachedRepo, c.Providers.Environment.Config.Prefix)
-	}
-	if c.Providers.File.Enabled {
-		conf := c.Providers.File.Config
-		err := file.Configure(ctx, cachedRepo, conf.Path, conf.Prefix)
+	if conf := c.Providers.File; conf.Enabled {
+		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	if c.Providers.Kubernetes.Enabled {
-		err := kubernetes.Configure(ctx, cachedRepo)
+	if conf := c.Providers.Kubernetes; conf.Enabled {
+		err := kubernetes.Configure(ctx, apiStore)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	return openapi.Sorted(cachedRepo), cachedRepo, nil
-}
-
-func staticSpec(str string) (openapi.Spec, error) {
-	parsed, err := parseString(str)
-	if err != nil {
-		return nil, err
-	}
-	return openapi.NewStaticSpec(parsed), nil
-}
-
-func parseString(str string) (interface{}, error) {
-	var res interface{}
-	err := json.Unmarshal([]byte(str), &res)
-	return res, err
+	return openapi.Sorted(cachedRepo), apiStore, nil
 }

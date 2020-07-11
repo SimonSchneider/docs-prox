@@ -39,11 +39,9 @@ func Configure(ctx context.Context, store openapi.ApiStore, path, prefix string)
 		watcher: watcher,
 		store:   store,
 	}
-	withCancel, cancel := context.WithCancel(ctx)
-	go dirWatcher.start(withCancel)
+	go dirWatcher.start(ctx)
 	err = dirWatcher.add(path)
 	if err != nil {
-		cancel()
 		return fmt.Errorf("fileRepository: unable to add path %s to directory Watcher: %w", path, err)
 	}
 	go func() {

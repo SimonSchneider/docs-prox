@@ -46,6 +46,34 @@ type ApiStore interface {
 	RemoveAllOf(source string)
 }
 
+type loggingApiStore struct {
+	delegate ApiStore
+}
+
+func Logging(delegate ApiStore) ApiStore {
+	return &loggingApiStore{delegate: delegate}
+}
+
+func (l *loggingApiStore) Put(source, key string, spec Spec) {
+	fmt.Printf("Putting (%s - %s)\n", source, key)
+	l.delegate.Put(source, key, spec)
+}
+
+func (l *loggingApiStore) ReplaceAllOf(source string, specs map[string]Spec) {
+	fmt.Printf("Replacing all (%s)\n", source)
+	l.delegate.ReplaceAllOf(source, specs)
+}
+
+func (l *loggingApiStore) Remove(source, key string) {
+	fmt.Printf("Removing (%s - %s)\n", source, key)
+	l.delegate.Remove(source, key)
+}
+
+func (l *loggingApiStore) RemoveAllOf(source string) {
+	fmt.Printf("Removing all (%s)\n", source)
+	l.delegate.RemoveAllOf(source)
+}
+
 type CachedRepository struct {
 	mu      *sync.RWMutex
 	sources map[string]map[string]struct{}

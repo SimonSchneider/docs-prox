@@ -12,25 +12,26 @@ import (
 
 func main() {
 	fmt.Println("loading configuration")
-	//config, _ := parse("_config/config.json")
-	conf, err := config.Parse("_config/config.json")
+	conf, err := config.ReadAndParseFile("_config/config.json")
 	if err != nil {
 		panic(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	repo, _, err := conf.BuildRepo(ctx)
 	if err != nil {
-		cancel()
 		panic(err)
 	}
 	fmt.Println("starting server")
 	go func() {
 		<-time.After(1 * time.Second)
-		cancel()
+		//cancel()
 	}()
-	err = openapi.Serve(ctx, repo, conf.Host, conf.Port)
-	if err != nil {
-		cancel()
+	_, errChan := openapi.Serve(ctx, repo, conf.Host, conf.Port)
+	select {
+	case err := <-errChan:
 		panic(err)
+	case <-ctx.Done():
+		return
 	}
 }
