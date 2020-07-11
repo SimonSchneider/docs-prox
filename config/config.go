@@ -1,9 +1,8 @@
-package main
+package config
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/SimonSchneider/docs-prox/providers/environment"
@@ -13,7 +12,7 @@ import (
 	"github.com/SimonSchneider/docs-prox/providers/kubernetes"
 )
 
-type config struct {
+type Config struct {
 	Host      string `json:"host"`
 	Port      int    `json:"port"`
 	Providers struct {
@@ -36,44 +35,61 @@ type config struct {
 	}
 }
 
-func parse(path string) (*config, error) {
+func Parse(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	var c config
+	var c Config
 	defer file.Close()
 	err = json.NewDecoder(file).Decode(&c)
 	return &c, err
 }
 
-func (c *config) buildProviders(ctx context.Context) openapi.Repository {
+func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.ApiStore, error) {
 	cachedRepo := openapi.NewCachedRepository()
-	cachedSpec1 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello\"}"))
-	cachedSpec2 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello from 2\"}"))
-	cachedSpec3 := openapi.NewStaticSpec(parseString("{\"hi\":\"hello from 3\"}"))
-	cachedRepo.Put("cached", "cachedSpec1", cachedSpec1)
-	cachedRepo.Put("cached", "cachedSpec2", cachedSpec2)
-	remoteSpec1 := openapi.NewRemoteSpec("https://petstore.swagger.io/v2/swagger.json")
-	cachedRepo.Put("cached", "remoteSpec1", remoteSpec1)
-	cachedRepo.Put("cached", "cachedSpec3", cachedSpec3)
+	staticSpecs := map[string]string{
+		"cachedSpec1": "{\"hi\":\"hello\"}",
+		"cachedSpec2": "{\"hi\":\"hello from 2\"}",
+		"cachedSpec3": "{\"hi\":\"hello from 3\"}",
+	}
+	for n, v := range staticSpecs {
+		spec, err := staticSpec(v)
+		if err != nil {
+			return nil, nil, err
+		}
+		cachedRepo.Put("cached", n, spec)
+	}
+	cachedRepo.Put("cached", "remoteSpec1", openapi.NewRemoteSpec("https://petstore.swagger.io/v2/swagger.json"))
 	if c.Providers.Environment.Enabled {
 		environment.Configure(cachedRepo, c.Providers.Environment.Config.Prefix)
 	}
 	if c.Providers.File.Enabled {
-		err := file.Configure(ctx, cachedRepo, c.Providers.File.Config.Path, c.Providers.File.Config.Prefix)
+		conf := c.Providers.File.Config
+		err := file.Configure(ctx, cachedRepo, conf.Path, conf.Prefix)
 		if err != nil {
-			fmt.Println(err)
+			return nil, nil, err
 		}
 	}
 	if c.Providers.Kubernetes.Enabled {
-		kubernetes.Configure(ctx, cachedRepo)
+		err := kubernetes.Configure(ctx, cachedRepo)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
-	return openapi.Sorted(cachedRepo)
+	return openapi.Sorted(cachedRepo), cachedRepo, nil
 }
 
-func parseString(str string) interface{} {
+func staticSpec(str string) (openapi.Spec, error) {
+	parsed, err := parseString(str)
+	if err != nil {
+		return nil, err
+	}
+	return openapi.NewStaticSpec(parsed), nil
+}
+
+func parseString(str string) (interface{}, error) {
 	var res interface{}
-	json.Unmarshal([]byte(str), &res)
-	return res
+	err := json.Unmarshal([]byte(str), &res)
+	return res, err
 }

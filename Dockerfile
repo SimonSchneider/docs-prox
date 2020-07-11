@@ -1,16 +1,16 @@
 FROM golang:1.14.0-stretch AS builder
 
-# ENV GO111MODULE=on \
-#   CGO_ENABLED=0 \
-#   GOARCH=amd64 \
-#   GOOS=linux
+ENV GO111MODULE=on \
+    CGO_ENABLED=0 \
+    GOARCH=amd64 \
+    GOOS=linux
 
 WORKDIR /build
-# COPY go.mod .
-# COPY go.sum .
-# RUN go mod download
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 COPY . .
-# RUN go build -a -o docs-prox ./cmd/*.go
+RUN go build -a -o docs-prox ./cmd/*.go
 
 RUN mkdir /data
 RUN cp -r _config /data/

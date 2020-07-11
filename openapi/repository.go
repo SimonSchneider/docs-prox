@@ -25,8 +25,8 @@ type sortedRepo struct {
 	delegate Repository
 }
 
-func Sorted(repository Repository) Repository {
-	return &sortedRepo{delegate: repository}
+func Sorted(delegate Repository) Repository {
+	return &sortedRepo{delegate: delegate}
 }
 
 func (s *sortedRepo) Keys() []string {

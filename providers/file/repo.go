@@ -39,13 +39,19 @@ func Configure(ctx context.Context, store openapi.ApiStore, path, prefix string)
 		watcher: watcher,
 		store:   store,
 	}
+	withCancel, cancel := context.WithCancel(ctx)
+	go dirWatcher.start(withCancel)
+	err = dirWatcher.add(path)
+	if err != nil {
+		cancel()
+		return fmt.Errorf("fileRepository: unable to add path %s to directory Watcher: %w", path, err)
+	}
 	go func() {
 		<-ctx.Done()
-		fmt.Printf("stopping directory watcher\n")
+		fmt.Printf("fileRepository: stopping directory watcher\n")
 		watcher.Close()
 	}()
-	go dirWatcher.start(ctx)
-	return dirWatcher.add(path)
+	return nil
 }
 
 type dirWatcher struct {
@@ -96,7 +102,7 @@ func (d *dirWatcher) start(ctx context.Context) {
 			if !ok {
 				return
 			}
-			fmt.Println("error:", err)
+			fmt.Printf("error: %s\n", err)
 		}
 	}
 }
