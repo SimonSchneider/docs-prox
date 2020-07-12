@@ -31,7 +31,7 @@ cover: test
 race: deps lint outdir
 	$(GOTEST) -coverprofile "$(COVERFILE)" -race ./... -v
 test: deps lint outdir
-	$(GOTEST) -coverpkg ./... -coverprofile "$(COVER_FILE)" ./...
+	$(GOTEST) -coverpkg ./... -coverprofile "$(COVER_FILE)" ./... -v
 lint:
 	go mod tidy
 	go fmt ./...

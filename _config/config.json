@@ -12,7 +12,7 @@
       "prefix": "swagger_"
     },
     "kubernetes": {
-      "enabled": false
+      "enabled": true
     }
   }
 }

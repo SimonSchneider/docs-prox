@@ -5,17 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/SimonSchneider/docs-prox/test/await"
 
@@ -25,6 +28,19 @@ import (
 
 func TestCombiningDifferentProviders(t *testing.T) {
 	httpSpecServer := runHTTPSpecServer()
+	minikube, err := startMiniKube()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer minikube.Close()
+	err = minikube.addConfigMap("swagger-test", map[string]string{"service-in-cm": httpSpecServer.Add("service-in-cm")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = minikube.addService("test-service-in-kube")
+	if err != nil {
+		t.Fatal(err)
+	}
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	if err != nil {
 		t.Fatal(err)
@@ -37,30 +53,41 @@ func TestCombiningDifferentProviders(t *testing.T) {
 	fileSpecServer.Add("swagger-found-file.json")
 	specServer := AllOf(httpSpecServer, fileSpecServer)
 	tests := []struct {
-		name    string
-		before  func()
-		config  TmplConfig
-		numKeys int
+		name            string
+		before          func()
+		config          TmplConfig
+		numKeys         int
+		unreachableKeys []string
 	}{
 		{
-			name:    "no providers should have no keys",
-			config:  TmplConfig{},
-			numKeys: 0,
+			name:            "no providers should have no keys",
+			config:          TmplConfig{},
+			numKeys:         0,
+			unreachableKeys: []string{},
 		},
 		{
-			name:    "env provider can be configured",
-			config:  TmplConfig{EnvPrefix: "SWAGGER_"},
-			numKeys: 1,
+			name:            "env provider can be configured",
+			config:          TmplConfig{EnvPrefix: "SWAGGER_"},
+			numKeys:         1,
+			unreachableKeys: []string{},
 		},
 		{
-			name:    "file provider can be configure",
-			config:  TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix},
-			numKeys: 1,
+			name:            "file provider can be configure",
+			config:          TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix},
+			numKeys:         1,
+			unreachableKeys: []string{},
 		},
 		{
-			name:    "env and file provider can be configured",
-			config:  TmplConfig{EnvPrefix: "SWAGGER_", FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix},
-			numKeys: 2,
+			name:            "kubernetes provider can be configured",
+			config:          TmplConfig{KubeEnabled: true},
+			numKeys:         2,
+			unreachableKeys: []string{"test-service-in-kube"},
+		},
+		{
+			name:            "all providers can be configured",
+			config:          TmplConfig{EnvPrefix: "SWAGGER_", FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix, KubeEnabled: true},
+			numKeys:         4,
+			unreachableKeys: []string{"test-service-in-kube"},
 		},
 	}
 	for _, test := range tests {
@@ -69,7 +96,9 @@ func TestCombiningDifferentProviders(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = validate(client, test.numKeys, specServer)
+			err = await.AtMost(5 * time.Second).Until(func() error {
+				return validate(client, test.numKeys, specServer, test.unreachableKeys...)
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -137,7 +166,7 @@ func runOpenAPIServer(tmplConfig TmplConfig) (*testClient, error) {
 	return newTestClient(listener.Addr()), nil
 }
 
-func validate(client *testClient, numKeys int, server SpecServer) error {
+func validate(client *testClient, numKeys int, server SpecServer, unreachableKeys ...string) error {
 	keys, err := client.getKeys()
 	if err != nil {
 		return err
@@ -146,6 +175,9 @@ func validate(client *testClient, numKeys int, server SpecServer) error {
 		return fmt.Errorf("got an unexpected number of keys %d: %v", len(keys), keys)
 	}
 	for _, key := range keys {
+		if contains(unreachableKeys, key.Name) {
+			continue
+		}
 		spec, err := client.getSpec(key.Path)
 		if err != nil {
 			return err
@@ -159,6 +191,15 @@ func validate(client *testClient, numKeys int, server SpecServer) error {
 		}
 	}
 	return nil
+}
+
+func contains(arr []string, key string) bool {
+	for _, item := range arr {
+		if item == key {
+			return true
+		}
+	}
+	return false
 }
 
 type testClient struct {
@@ -336,10 +377,107 @@ func (f *fileSpecServer) fileIsSpec(fileName string, fun func(name string)) {
 	}
 }
 
+type minikube struct {
+	configMaps []string
+	services   []string
+}
+
+func startMiniKube() (*minikube, error) {
+	var out bytes.Buffer
+	err := run(30*time.Second, &out, "minikube", "status")
+	output := string(out.Bytes())
+	if !strings.Contains(output, "Running") {
+		err = run(30*time.Second, os.Stdout, "minikube", "start")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &minikube{configMaps: make([]string, 0), services: make([]string, 0)}, nil
+}
+
+func (m *minikube) Close() (err error) {
+	for _, cm := range m.configMaps {
+		err = run(2*time.Second, os.Stdout, "kubectl", "delete", "cm", cm)
+		if err != nil {
+			return err
+		}
+	}
+	for _, svc := range m.services {
+		err = run(2*time.Second, os.Stdout, "kubectl", "delete", "service", svc)
+		if err != nil {
+			return err
+		}
+		err = run(2*time.Second, os.Stdout, "kubectl", "delete", "deployment", svc)
+		if err != nil {
+			return err
+		}
+	}
+	return
+}
+
+type ConfigMapTemplate struct {
+	Name    string
+	Entries map[string]string
+}
+
+func (m *minikube) addConfigMap(name string, entries map[string]string) error {
+	tpl, err := template.ParseFiles("configmap.goyaml")
+	if err != nil {
+		return err
+	}
+	err = createAndApplyFile(tpl, ConfigMapTemplate{Name: name, Entries: entries})
+	if err != nil {
+		return err
+	}
+	m.configMaps = append(m.configMaps, name)
+	return nil
+}
+
+type ServiceTemplate struct {
+	Name string
+}
+
+func (m *minikube) addService(name string) error {
+	tpl, err := template.ParseFiles("service.goyaml")
+	if err != nil {
+		return err
+	}
+	err = createAndApplyFile(tpl, ServiceTemplate{Name: name})
+	if err != nil {
+		return err
+	}
+	m.services = append(m.services, name)
+	return nil
+}
+
+func createAndApplyFile(tpl *template.Template, val interface{}) error {
+	file, err := ioutil.TempFile("", "kube-resource")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	err = tpl.Execute(file, val)
+	if err != nil {
+		return err
+	}
+	return run(2*time.Second, os.Stdout, "kubectl", "apply", "-f", file.Name())
+}
+
+func run(timeout time.Duration, out io.Writer, command string, args ...string) error {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(timeout))
+	defer cancel()
+	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Stdout = out
+	cmd.Stderr = out
+	return cmd.Run()
+}
+
 type TmplConfig struct {
-	EnvPrefix  string
-	FilePath   string
-	FilePrefix string
+	EnvPrefix   string
+	FilePath    string
+	FilePrefix  string
+	KubeEnabled bool
 }
 
 type testConfig struct {
@@ -366,6 +504,11 @@ func newTestConfig() (*testConfig, error) {
 			"prefix": "{{ .FilePrefix }}"
         },
 		{{- end}}
+		{{- if .KubeEnabled }}
+		"kubernetes": {
+			"enabled": true
+		},
+		{{- end }}
 		"thisisignored": 2
 	}
 }

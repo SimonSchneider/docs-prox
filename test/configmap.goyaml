@@ -1,0 +1,12 @@
+{{- /*gotype: github.com/SimonSchneider/docs-prox/test.ConfigMapTemplate*/ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: {{ .Name }}
+    namespace: default
+    labels:
+        remote-swagger: ""
+data:
+{{- range $key, $val := .Entries }}
+    {{ $key }}: {{ $val }}
+{{ end }}
