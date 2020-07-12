@@ -16,7 +16,8 @@ import (
 	"sync"
 	"testing"
 	"text/template"
-	"time"
+
+	"github.com/SimonSchneider/docs-prox/test/await"
 
 	"github.com/SimonSchneider/docs-prox/config"
 	"github.com/SimonSchneider/docs-prox/openapi"
@@ -92,21 +93,21 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	fileSpecServer.Add("swagger-found-file-2.json")
-	err = await(100*time.Millisecond, 5*time.Second, func() error {
+	err = await.Until(func() error {
 		return validate(client, 2, fileSpecServer)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fileSpecServer.Add("not-found-file.txt")
-	err = await(1*time.Second, 5*time.Second, func() error {
+	err = await.Until(func() error {
 		return validate(client, 2, fileSpecServer)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fileSpecServer.Delete("swagger-found-file-1.json")
-	err = await(100*time.Millisecond, 5*time.Second, func() error {
+	err = await.Until(func() error {
 		return validate(client, 1, fileSpecServer)
 	})
 	if err != nil {
@@ -204,6 +205,10 @@ type SpecResp struct {
 	ID string
 }
 
+func randomSwaggerResp() SpecResp {
+	return SpecResp{ID: strconv.Itoa(rand.Int())}
+}
+
 type SpecServer interface {
 	Get(key string) (SpecResp, bool)
 }
@@ -266,57 +271,6 @@ func (s *httpSpecServer) Add(key string) string {
 func (s *httpSpecServer) Get(key string) (SpecResp, bool) {
 	spec, ok := s.responses[key]
 	return spec, ok
-}
-
-func randomSwaggerResp() SpecResp {
-	return SpecResp{ID: strconv.Itoa(rand.Int())}
-}
-
-type TmplConfig struct {
-	EnvPrefix  string
-	FilePath   string
-	FilePrefix string
-}
-
-type testConfig struct {
-	tmpl *template.Template
-}
-
-func newTestConfig() (*testConfig, error) {
-	tpl, err := template.New("config").Parse(`
-{
-	"host": "",
-	"port": 0,
-	"providers": {
-		{{- if (not (eq .EnvPrefix ""))}}
-		"environment": {
-			"enabled": true,
-			"prefix": "{{ .EnvPrefix }}"
-		},
-		{{- end}}
-		{{- if (not ( eq .FilePath "")) }}
-		 "file": {
-			"enabled": true,
-			"path": "{{ .FilePath }}",
-			"prefix": "{{ .FilePrefix }}"
-        },
-		{{- end}}
-		"thisisignored": 2
-	}
-}
-`)
-	if err != nil {
-		return nil, err
-	}
-	return &testConfig{tpl}, nil
-}
-
-func (t *testConfig) configWith(conf TmplConfig) (string, error) {
-	var tpl bytes.Buffer
-	if err := t.tmpl.Execute(&tpl, conf); err != nil {
-		return "", err
-	}
-	return tpl.String(), nil
 }
 
 type fileSpecServer struct {
@@ -382,44 +336,49 @@ func (f *fileSpecServer) fileIsSpec(fileName string, fun func(name string)) {
 	}
 }
 
-func await(interval, atMost time.Duration, runner func() error) error {
-	timeout := make(chan struct{})
-	try := make(chan struct{})
-	go func() {
-		select {
-		case <-time.After(atMost):
-			close(timeout)
-		case <-timeout:
-			return
-		}
-	}()
-	go func() {
-		for {
-			select {
-			case <-timeout:
-				close(try)
-				return
-			case <-time.After(interval):
-				try <- struct{}{}
-			}
-		}
-	}()
-	errors := make(chan error)
-	go func() {
-		defer close(errors)
-		for {
-			select {
-			case <-timeout:
-				errors <- fmt.Errorf("timed out waiting for condition")
-				return
-			case <-try:
-				err := runner()
-				if err == nil {
-					return
-				}
-				fmt.Printf("failed to try %v\n", err)
-			}
-		}
-	}()
-	return <-errors
+type TmplConfig struct {
+	EnvPrefix  string
+	FilePath   string
+	FilePrefix string
+}
+
+type testConfig struct {
+	tmpl *template.Template
+}
+
+func newTestConfig() (*testConfig, error) {
+	tpl, err := template.New("config").Parse(`
+{
+	"host": "",
+	"port": 0,
+	"providers": {
+		{{- if (not (eq .EnvPrefix ""))}}
+		"environment": {
+			"enabled": true,
+			"prefix": "{{ .EnvPrefix }}"
+		},
+		{{- end}}
+		{{- if (not ( eq .FilePath "")) }}
+		 "file": {
+			"enabled": true,
+			"path": "{{ .FilePath }}",
+			"prefix": "{{ .FilePrefix }}"
+        },
+		{{- end}}
+		"thisisignored": 2
+	}
+}
+`)
+	if err != nil {
+		return nil, err
+	}
+	return &testConfig{tpl}, nil
+}
+
+func (t *testConfig) configWith(conf TmplConfig) (string, error) {
+	var tpl bytes.Buffer
+	if err := t.tmpl.Execute(&tpl, conf); err != nil {
+		return "", err
+	}
+	return tpl.String(), nil
 }
