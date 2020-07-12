@@ -121,11 +121,11 @@ func runOpenAPIServer(tmplConfig TmplConfig) (*testClient, error) {
 		return nil, err
 	}
 	ctx := context.Background()
-	str, err := testConfig.configWith(tmplConfig)
+	path, err := testConfig.configWith(tmplConfig)
 	if err != nil {
 		return nil, err
 	}
-	conf, err := config.Parse(strings.NewReader(str))
+	conf, err := config.ReadAndParseFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -344,6 +344,7 @@ type TmplConfig struct {
 
 type testConfig struct {
 	tmpl *template.Template
+	dir  string
 }
 
 func newTestConfig() (*testConfig, error) {
@@ -372,7 +373,17 @@ func newTestConfig() (*testConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &testConfig{tpl}, nil
+	return &testConfig{tpl, ""}, nil
+}
+
+func (t *testConfig) Close() error {
+	if t.dir != "" {
+		filepath.Walk(t.dir, func(path string, info os.FileInfo, err error) error {
+			return os.Remove(path)
+		})
+		os.Remove(t.dir)
+	}
+	return nil
 }
 
 func (t *testConfig) configWith(conf TmplConfig) (string, error) {
@@ -380,5 +391,21 @@ func (t *testConfig) configWith(conf TmplConfig) (string, error) {
 	if err := t.tmpl.Execute(&tpl, conf); err != nil {
 		return "", err
 	}
-	return tpl.String(), nil
+	dir, err := ioutil.TempDir("", "config")
+	if err != nil {
+		t.Close()
+		return "", err
+	}
+	path := filepath.Join(dir, "config.json")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Close()
+		return "", err
+	}
+	_, err = tpl.WriteTo(file)
+	if err != nil {
+		t.Close()
+		return "", err
+	}
+	return path, nil
 }
