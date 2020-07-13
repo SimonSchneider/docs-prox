@@ -44,11 +44,11 @@ func (a AwaitData) Every(interval time.Duration) AwaitData {
 	return a
 }
 
-func Until(runner func() error) error {
-	return newDefault().Until(runner)
+func That(runner func() error) error {
+	return newDefault().That(runner)
 }
 
-func (a AwaitData) Until(runner func() error) error {
+func (a AwaitData) That(runner func() error) error {
 	timeout := make(chan struct{})
 	go func() {
 		<-time.After(a.timeout)

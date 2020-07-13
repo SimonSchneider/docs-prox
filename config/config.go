@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -37,7 +38,7 @@ type Config struct {
 func ReadAndParseFile(path string) (*Config, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open config file %s: %w", path, err)
 	}
 	defer file.Close()
 	return Parse(file)
@@ -47,7 +48,10 @@ func ReadAndParseFile(path string) (*Config, error) {
 func Parse(r io.Reader) (*Config, error) {
 	var c Config
 	err := json.NewDecoder(r).Decode(&c)
-	return &c, err
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse config file: %w", err)
+	}
+	return &c, nil
 }
 
 // BuildRepo builds a repo and APIStore
@@ -60,13 +64,13 @@ func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.Spe
 	if conf := c.Providers.File; conf.Enabled {
 		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("unable to configure file provider with config %v: %w", conf, err)
 		}
 	}
 	if conf := c.Providers.Kubernetes; conf.Enabled {
 		err := kubernetes.Configure(ctx, apiStore)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("unable to configure kubernetes provider with config %v: %w", conf, err)
 		}
 	}
 	return openapi.Sorted(cachedRepo), apiStore, nil
