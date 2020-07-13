@@ -1,0 +1,47 @@
+.grid {
+    display: grid;
+    grid-template-columns: max(150px, min(300px, 20%)) auto;
+    grid-template-areas: "sidebar content";
+    height: 100vh;
+}
+
+.sidebarWrapper {
+    background-color: white;
+    border-right: 5px solid whitesmoke;
+    grid-area: sidebar;
+    position: fixed;
+    height: 100%;
+    width: max(150px, min(300px, 20%));
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.sidebar {
+    font-size: 20px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.sidebarItemWrapper {
+    width: 95%;
+    border-bottom: 2px solid whitesmoke;
+    padding-left: 5px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    cursor: pointer;
+}
+
+.selectedSidebarItem {
+    color: black;
+    font-weight: bold;
+}
+
+.sidebarItem {
+    color: rgba(82, 82, 82, 0.99);
+}
+
+.contentWrapper {
+    grid-area: content;
+    overflow-y: scroll;
+}
+

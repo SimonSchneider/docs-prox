@@ -16,7 +16,7 @@ import (
 // Serve starts a server that serves the repo
 func Serve(ctx context.Context, repo Repository, host string, port int) (net.Listener, <-chan error) {
 	r := mux.NewRouter()
-	fs := http.FileServer(http.Dir("./redoc"))
+	fs := http.FileServer(http.Dir("./dist"))
 	for _, fun := range []repoHandlerFunc{keyHandler, docsHandler} {
 		path, handler := fun(repo)
 		r.Handle(fmt.Sprintf("/docs%s", path), handler)

@@ -25,9 +25,9 @@ docker: build build-ui
 build: deps
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux GO111MODULE=on $(GOBUILD) -o $(BINARY_NAME) -v $(MAIN_FILE)
 build-ui:
-	cd _redoc && yarn build
-	rm -rf $(BUILD_DIR)/redoc
-	cp -r _redoc/build $(BUILD_DIR)/redoc
+	cd _docs-prox-ui && yarn build
+	rm -rf $(BUILD_DIR)/dist
+	cp -r _docs-prox-ui/build $(BUILD_DIR)/dist
 verify: race bench
 bench: outdir
 	$(GOTEST) ./$(BENCH_DIR) -bench=. -benchtime $(BENCH_TIME) -benchmem -memprofile "$(BENCH_MEM_FILE)" -cpuprofile "$(BENCH_CPU_FILE)"

@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { RedocStandalone } from "redoc";
+// import { RedocStandalone } from "redoc";
+import SwaggerUI from "swagger-ui-react";
+import "swagger-ui-react/swagger-ui.css";
 import styles from "./grid.module.css";
 
 async function load() {
@@ -15,27 +17,29 @@ async function load() {
 
 function SidebarButton({ spec, selected, pinned, onClick }) {
   return (
-    <button
-      style={{
-        color: selected ? "red" : "",
-      }}
-      onClick={onClick}
-    >
-      {spec.name}
-    </button>
+    <div className={styles.sidebarItemWrapper}>
+      <div
+        className={selected ? styles.selectedSidebarItem : styles.sidebarItem}
+        onClick={onClick}
+      >
+        {spec.name}
+      </div>
+    </div>
   );
 }
 
 function Sidebar({ specs, selectedSpec, selectSpec }) {
   return (
-    <div className={styles.sidebar}>
-      {specs.map((spec) => (
-        <SidebarButton
-          spec={spec}
-          selected={spec === selectedSpec}
-          onClick={() => selectSpec(spec)}
-        />
-      ))}
+    <div className={styles.sidebarWrapper}>
+      <div className={styles.sidebar}>
+        {specs.map((spec) => (
+          <SidebarButton
+            spec={spec}
+            selected={spec === selectedSpec}
+            onClick={() => selectSpec(spec)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -50,12 +54,11 @@ function Content({ specs }) {
         selectSpec={selectSpec}
       />
       <div className={styles.contentWrapper}>
-        <div className={styles.content}>
-          <RedocStandalone specUrl={selectedSpec.url} />
-        </div>
+        <SwaggerUI url={selectedSpec.url} />
       </div>
     </div>
   );
+  // {/*<RedocStandalone specUrl={selectedSpec.url} />*/}
 }
 
 function App() {
