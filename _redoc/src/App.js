@@ -4,10 +4,10 @@ import styles from "./grid.module.css";
 
 async function load() {
   console.log("loading");
-  const resp = await fetch("http://localhost:10021/docs/");
+  const resp = await fetch("/docs/");
   const specs = (await resp.json()).map((r) => ({
     name: r.name,
-    url: `http://localhost:10021${r.path}`,
+    url: r.path,
   }));
   console.log(specs);
   return specs;
