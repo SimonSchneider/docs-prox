@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-// import { RedocStandalone } from "redoc";
+import { Icon } from "semantic-ui-react";
 import SwaggerUI from "swagger-ui-react";
 import "swagger-ui-react/swagger-ui.css";
 import styles from "./grid.module.css";
@@ -15,7 +15,30 @@ async function load() {
   return specs;
 }
 
-function SidebarButton({ spec, selected, pinned, onClick }) {
+function getPinned() {
+  const pinned = JSON.parse(localStorage.getItem("pinned-items"));
+  return pinned ? pinned : [];
+}
+
+function setPinned(pinned) {
+  localStorage.setItem("pinned-items", JSON.stringify(pinned));
+}
+
+function addPin(name) {
+  console.log(`adding ping ${name}`);
+  const pinned = getPinned();
+  if (pinned.includes(name)) {
+    return;
+  }
+  setPinned([...pinned, name]);
+}
+
+function removePin(name) {
+  console.log(`removing ping ${name}`);
+  setPinned(getPinned().filter((p) => p !== name));
+}
+
+function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
   return (
     <div className={styles.sidebarItemWrapper}>
       <div
@@ -24,21 +47,46 @@ function SidebarButton({ spec, selected, pinned, onClick }) {
       >
         {spec.name}
       </div>
+      <div
+        className={pinned ? styles.sidebarPinPinned : styles.sidebarPin}
+        onClick={togglePinned}
+      >
+        <Icon disabled={!pinned} name="pin" size="small" />
+      </div>
     </div>
   );
 }
 
 function Sidebar({ specs, selectedSpec, selectSpec }) {
+  const [pinned, setPinned] = useState(getPinned());
+  function getTogglePinned(name, isPinned) {
+    return () => {
+      isPinned ? removePin(name) : addPin(name);
+      setPinned(getPinned());
+    };
+  }
+  const allSpecs = specs.map((s) => ({
+    ...s,
+    pinned: pinned.includes(s.name),
+  }));
+  const sortedSpecs = [
+    ...allSpecs.filter((s) => s.pinned),
+    ...allSpecs.filter((s) => !s.pinned),
+  ];
   return (
     <div className={styles.sidebarWrapper}>
       <div className={styles.sidebar}>
-        {specs.map((spec) => (
-          <SidebarButton
-            spec={spec}
-            selected={spec === selectedSpec}
-            onClick={() => selectSpec(spec)}
-          />
-        ))}
+        {sortedSpecs.map((spec) => {
+          return (
+            <SidebarButton
+              spec={spec}
+              selected={spec.name === selectedSpec.name}
+              onClick={() => selectSpec(spec)}
+              pinned={spec.pinned}
+              togglePinned={getTogglePinned(spec.name, spec.pinned)}
+            />
+          );
+        })}
       </div>
     </div>
   );

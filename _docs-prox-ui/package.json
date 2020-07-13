@@ -6,6 +6,7 @@
     "react": "^16.13.1",
     "react-dom": ">=15.6.2",
     "react-scripts": "3.4.1",
+    "semantic-ui-react": "^0.88.2",
     "swagger-ui-react": "^3.28.0"
   },
   "scripts": {
