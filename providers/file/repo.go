@@ -2,8 +2,8 @@ package file
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,15 +16,13 @@ type fileSpec struct {
 	path string
 }
 
-func (s *fileSpec) JSONSpec() (interface{}, error) {
+func (s *fileSpec) Get() ([]byte, error) {
 	file, err := os.Open(s.path)
 	if err != nil {
 		return nil, err
 	}
-	var result interface{}
 	defer file.Close()
-	err = json.NewDecoder(file).Decode(&result)
-	return result, err
+	return ioutil.ReadAll(file)
 }
 
 // Configure the store to add the path for json files with prefix

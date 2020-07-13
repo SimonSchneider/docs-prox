@@ -20,10 +20,14 @@ BENCH_DIR=decoder
 all: clean verify build docker
 run: docker
 	docker run $(DOCKER_NAME):$(TAG)
-docker: build
+docker: build build-ui
 	docker build $(BUILD_DIR) -t $(DOCKER_NAME):$(TAG)
 build: deps
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux GO111MODULE=on $(GOBUILD) -o $(BINARY_NAME) -v $(MAIN_FILE)
+build-ui:
+	cd _redoc && yarn build
+	rm -rf $(BUILD_DIR)/redoc
+	cp -r _redoc/build $(BUILD_DIR)/redoc
 verify: race bench
 bench: outdir
 	$(GOTEST) ./$(BENCH_DIR) -bench=. -benchtime $(BENCH_TIME) -benchmem -memprofile "$(BENCH_MEM_FILE)" -cpuprofile "$(BENCH_CPU_FILE)"

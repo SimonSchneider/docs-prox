@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/SimonSchneider/docs-prox/openapi"
@@ -12,7 +13,11 @@ import (
 
 func main() {
 	fmt.Println("loading configuration")
-	conf, err := config.ReadAndParseFile("_config/config.json")
+	path := os.Getenv("CONFIG_FILE")
+	if path == "" {
+		path = "_config/config.json"
+	}
+	conf, err := config.ReadAndParseFile(path)
 	if err != nil {
 		panic(err)
 	}

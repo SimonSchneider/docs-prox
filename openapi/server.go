@@ -16,12 +16,12 @@ import (
 // Serve starts a server that serves the repo
 func Serve(ctx context.Context, repo Repository, host string, port int) (net.Listener, <-chan error) {
 	r := mux.NewRouter()
-	fs := http.FileServer(http.Dir("./dist"))
+	fs := http.FileServer(http.Dir("./redoc"))
 	for _, fun := range []repoHandlerFunc{keyHandler, docsHandler} {
 		path, handler := fun(repo)
 		r.Handle(fmt.Sprintf("/docs%s", path), handler)
 	}
-	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", fs))
+	r.PathPrefix("/").Handler(http.StripPrefix("/", fs))
 
 	listener, err := net.Listen("tcp4", net.JoinHostPort(host, strconv.Itoa(port)))
 	errFuture := make(chan error)
@@ -81,15 +81,9 @@ func docsHandler(repo Repository) (string, http.Handler) {
 			rw.WriteHeader(http.StatusNotFound)
 			return
 		}
-		raw, err := spec.JSONSpec()
+		bytes, err := spec.Get()
 		if err != nil {
 			fmt.Printf("unable to retrieve spec %s: %v\n", key, err)
-			rw.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		bytes, err := json.Marshal(raw)
-		if err != nil {
-			fmt.Printf("unable to marshal spec %s: %v\n", key, err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
