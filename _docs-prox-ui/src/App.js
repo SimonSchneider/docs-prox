@@ -76,6 +76,7 @@ function Sidebar({ specs, selectedSpec, selectSpec }) {
   return (
     <div className={styles.sidebarWrapper}>
       <div className={styles.sidebar}>
+        <div className={styles.sidebarHeader}>Docs Prox</div>
         {sortedSpecs.map((spec) => {
           return (
             <SidebarButton

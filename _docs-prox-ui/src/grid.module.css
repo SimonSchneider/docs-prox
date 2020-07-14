@@ -14,6 +14,7 @@
     width: max(150px, min(300px, 20%));
     z-index: 1000;
     overflow-y: auto;
+    font-family: sans-serif;
 }
 
 .sidebar {
@@ -29,6 +30,11 @@
     padding-right: 5px;
     cursor: pointer;
     white-space: nowrap;
+}
+
+.sidebarHeader {
+    line-height: 3em;
+    padding-left: 5px;
 }
 
 .selectedSidebarItem {
