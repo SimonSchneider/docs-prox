@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -27,6 +28,7 @@ import (
 )
 
 func TestCombiningDifferentProviders(t *testing.T) {
+	envPrefix := strconv.Itoa(rand.Int())
 	httpSpecServer := runHTTPSpecServer()
 	minikube, err := startMiniKube()
 	check(t, err)
@@ -38,11 +40,12 @@ func TestCombiningDifferentProviders(t *testing.T) {
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	check(t, err)
 	defer fileSpecServer.Close()
-	check(t, os.Setenv("SWAGGER_TEST", httpSpecServer.Add("test")))
+	check(t, os.Setenv(envPrefix+"TEST", httpSpecServer.Add("test")))
 	check(t, os.Setenv("NOT_EXISTING", httpSpecServer.Add("notRegistered")))
-	check(t, fileSpecServer.Add("test-file-not-found.json"))
-	check(t, fileSpecServer.Add("swagger-not-found2.txt"))
-	check(t, fileSpecServer.Add("swagger-found-file.json"))
+	check(t, fileSpecServer.AddJsonFile("test-file-not-found.json"))
+	check(t, fileSpecServer.AddJsonFile("swagger-not-found2.txt"))
+	check(t, fileSpecServer.AddJsonFile("swagger-found-file.json"))
+	check(t, fileSpecServer.AddUrlFile("swagger-found-url.url", map[string]string{"file-url-spec": httpSpecServer.Add("file-url-spec")}))
 	specServer := AllOf(httpSpecServer, fileSpecServer)
 	tests := []struct {
 		name            string
@@ -59,14 +62,14 @@ func TestCombiningDifferentProviders(t *testing.T) {
 		},
 		{
 			name:            "env provider can be configured",
-			config:          TmplConfig{EnvPrefix: "SWAGGER_"},
+			config:          TmplConfig{EnvPrefix: envPrefix},
 			numKeys:         1,
 			unreachableKeys: []string{},
 		},
 		{
 			name:            "file provider can be configure",
 			config:          TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix},
-			numKeys:         1,
+			numKeys:         2,
 			unreachableKeys: []string{},
 		},
 		{
@@ -77,8 +80,8 @@ func TestCombiningDifferentProviders(t *testing.T) {
 		},
 		{
 			name:            "all providers can be configured",
-			config:          TmplConfig{EnvPrefix: "SWAGGER_", FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix, KubeEnabled: true},
-			numKeys:         4,
+			config:          TmplConfig{EnvPrefix: envPrefix, FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix, KubeEnabled: true},
+			numKeys:         5,
 			unreachableKeys: []string{"test-service-in-kube"},
 		},
 	}
@@ -97,15 +100,15 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	check(t, err)
 	defer fileSpecServer.Close()
-	check(t, fileSpecServer.Add("swagger-found-file-1.json"))
+	check(t, fileSpecServer.AddJsonFile("swagger-found-file-1.json"))
 	client, err := runOpenAPIServer(TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix})
 	check(t, err)
 	check(t, validate(client, 1, fileSpecServer))
-	check(t, fileSpecServer.Add("swagger-found-file-2.json"))
+	check(t, fileSpecServer.AddJsonFile("swagger-found-file-2.json"))
 	check(t, await.That(func() error {
 		return validate(client, 2, fileSpecServer)
 	}))
-	check(t, fileSpecServer.Add("not-found-file.txt"))
+	check(t, fileSpecServer.AddJsonFile("not-found-file.txt"))
 	check(t, await.That(func() error {
 		return validate(client, 2, fileSpecServer)
 	}))
@@ -330,13 +333,14 @@ func (f *fileSpecServer) Get(key string) (SpecResp, bool) {
 	return s, ok
 }
 
-func (f *fileSpecServer) Add(fileName string) error {
+func (f *fileSpecServer) AddJsonFile(fileName string) error {
 	resp := randomSwaggerResp()
 	path := filepath.Join(f.dir, fileName)
 	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("unable to create file %s: %w", path, err)
 	}
+	defer file.Close()
 	err = json.NewEncoder(file).Encode(resp)
 	if err != nil {
 		return fmt.Errorf("unable to write to file %s: %w", path, err)
@@ -344,6 +348,24 @@ func (f *fileSpecServer) Add(fileName string) error {
 	f.fileIsSpec(fileName, func(key string) {
 		f.specs[key] = resp
 	})
+	return nil
+}
+
+func (f *fileSpecServer) AddUrlFile(fileName string, specs map[string]string) error {
+	path := filepath.Join(f.dir, fileName)
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("unable to create file %s: %w", path, err)
+	}
+	defer file.Close()
+	writer := bufio.NewWriter(file)
+	defer writer.Flush()
+	for key, spec := range specs {
+		_, err := writer.WriteString(fmt.Sprintf("%s: %s", key, spec))
+		if err != nil {
+			return fmt.Errorf("unable to write to file %s: %w", path, err)
+		}
+	}
 	return nil
 }
 
@@ -477,7 +499,9 @@ func newTestConfig() (*testConfig, error) {
 		 "file": {
 			"enabled": true,
 			"path": "{{ .FilePath }}",
-			"prefix": "{{ .FilePrefix }}"
+			"prefix": "{{ .FilePrefix }}",
+			"json-ext": ".json",
+			"url-ext": ".url"
         },
 		{{- end}}
 		{{- if .KubeEnabled }}

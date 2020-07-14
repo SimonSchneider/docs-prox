@@ -9,7 +9,9 @@
     "file": {
       "enabled": true,
       "path": "./_config",
-      "prefix": "swagger_"
+      "prefix": "swagger_",
+      "json-ext": ".json",
+      "url-ext": ".url"
     },
     "kubernetes": {
       "enabled": true

@@ -27,6 +27,8 @@ type Config struct {
 			Enabled bool   `json:"enabled"`
 			Path    string `json:"path"`
 			Prefix  string `json:"prefix"`
+			JsonExt string `json:"json-ext"`
+			UrlExt  string `json:"url-ext"`
 		} `json:"file"`
 		Kubernetes struct {
 			Enabled bool `json:"enabled"`
@@ -62,7 +64,7 @@ func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.Spe
 		environment.Configure(apiStore, conf.Prefix)
 	}
 	if conf := c.Providers.File; conf.Enabled {
-		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix)
+		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix, conf.JsonExt, conf.UrlExt)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to configure file provider with config %v: %w", conf, err)
 		}

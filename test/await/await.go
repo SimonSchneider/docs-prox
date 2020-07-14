@@ -58,17 +58,18 @@ func (a AwaitData) That(runner func() error) error {
 	<-time.After(a.initialDelay)
 	go func() {
 		defer close(errors)
+		var lastErr error
 		for {
 			select {
 			case <-timeout:
-				errors <- fmt.Errorf("timed out waiting for condition")
+				errors <- fmt.Errorf("timed out waiting for condition: %w", lastErr)
 				return
 			case <-time.After(a.interval):
 				err := runner()
 				if err == nil {
 					return
 				}
-				fmt.Printf("failed to try %v\n", err)
+				lastErr = err
 			}
 		}
 	}()

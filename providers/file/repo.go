@@ -1,9 +1,11 @@
 package file
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +28,7 @@ func (s *fileSpec) Get() ([]byte, error) {
 }
 
 // Configure the store to add the path for json files with prefix
-func Configure(ctx context.Context, store openapi.SpecStore, path, prefix string) error {
+func Configure(ctx context.Context, store openapi.SpecStore, path, prefix, jsonExt, urlExt string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("fileRepository: unable to start filewatcher: %w", err)
@@ -34,6 +36,8 @@ func Configure(ctx context.Context, store openapi.SpecStore, path, prefix string
 	dirWatcher := &dirWatcher{
 		source:  fmt.Sprintf("dirWatcher-%s", path),
 		prefix:  prefix,
+		jsonExt: jsonExt,
+		urlExt:  urlExt,
 		watcher: watcher,
 		store:   store,
 	}
@@ -51,10 +55,11 @@ func Configure(ctx context.Context, store openapi.SpecStore, path, prefix string
 }
 
 type dirWatcher struct {
-	source  string
-	prefix  string
-	watcher *fsnotify.Watcher
-	store   openapi.SpecStore
+	source          string
+	prefix          string
+	jsonExt, urlExt string
+	watcher         *fsnotify.Watcher
+	store           openapi.SpecStore
 }
 
 type changeType int32
@@ -104,21 +109,71 @@ func (d *dirWatcher) start(ctx context.Context) {
 }
 
 func (d *dirWatcher) change(path string, cType changeType) {
-	if key, ok := d.getKey(path); ok {
-		switch cType {
-		case add:
-			d.store.Put(d.source, key, &fileSpec{path})
-		case remove:
-			d.store.Remove(d.source, key)
+	if keyType, key, ok := d.getKey(path); ok {
+		switch keyType {
+		case jsonKey:
+			d.changeJsonFile(key, path, cType)
+		case urlKey:
+			d.changeUrlFile(key, path, cType)
 		}
 	}
 }
 
-func (d *dirWatcher) getKey(path string) (string, bool) {
-	fileName := filepath.Base(path)
-	if strings.HasPrefix(fileName, d.prefix) && filepath.Ext(fileName) == ".json" {
-		key := strings.TrimSuffix(strings.TrimPrefix(fileName, d.prefix), ".json")
-		return key, true
+func (d *dirWatcher) changeJsonFile(key, path string, cType changeType) {
+	switch cType {
+	case add:
+		d.store.Put(d.source, key, &fileSpec{path})
+	case remove:
+		d.store.Remove(d.source, key)
 	}
-	return "", false
+}
+
+func (d *dirWatcher) changeUrlFile(key, path string, cType changeType) {
+	source := fmt.Sprintf("%s-%s", d.source, key)
+	switch cType {
+	case add:
+		file, err := os.Open(path)
+		if err != nil {
+			log.Fatalf("unable to parse url file %s: %v", path, err)
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		specs := make(map[string]openapi.Spec)
+		for scanner.Scan() {
+			row := scanner.Text()
+			if split := strings.SplitN(row, ": ", 2); len(split) == 2 {
+				specs[strings.Trim(split[0], " ")] = openapi.NewRemoteSpec(strings.Trim(split[1], " "))
+			} else {
+				log.Fatalf("unexpected file formatting in file %s row %s", path, row)
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			log.Fatalf("error when scanning file %s: %v", path, err)
+			return
+		}
+		d.store.ReplaceAllOf(source, specs)
+	case remove:
+		d.store.RemoveAllOf(source)
+	}
+}
+
+type KeyType int32
+
+const (
+	jsonKey KeyType = iota
+	urlKey
+)
+
+func (d *dirWatcher) getKey(path string) (KeyType, string, bool) {
+	fileName := filepath.Base(path)
+	if strings.HasPrefix(fileName, d.prefix) {
+		withoutPrefix := strings.TrimPrefix(fileName, d.prefix)
+		switch filepath.Ext(fileName) {
+		case d.jsonExt:
+			return jsonKey, strings.TrimSuffix(withoutPrefix, d.jsonExt), true
+		case d.urlExt:
+			return urlKey, strings.TrimSuffix(withoutPrefix, d.urlExt), true
+		}
+	}
+	return jsonKey, "", false
 }
