@@ -7,7 +7,7 @@
 
 .sidebarWrapper {
     background-color: white;
-    border-right: 5px solid whitesmoke;
+    border-right: 1px solid rgba(0,0,0,0.15);
     grid-area: sidebar;
     position: fixed;
     height: 100%;
@@ -17,17 +17,16 @@
 }
 
 .sidebar {
-    font-size: 20px;
+    font-size: 13pt;
+    line-height: 2em;
     padding-left: 5px;
     padding-right: 5px;
 }
 
 .sidebarItemWrapper {
-    border-bottom: 2px solid whitesmoke;
+    border-bottom: 1px solid rgba(0,0,0,0.15);
     padding-left: 5px;
     padding-right: 5px;
-    padding-top: 4px;
-    padding-bottom: 4px;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -49,7 +48,7 @@
     float: right;
     width:15px;
     z-index: 1000;
-    opacity: 10%;
+    opacity: 20%;
 }
 .sidebarPin:hover {
     opacity: 100%;
