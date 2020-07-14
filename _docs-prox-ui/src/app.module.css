@@ -39,6 +39,7 @@
 
 .sidebarItem {
   color: rgba(82, 82, 82, 0.99);
+  vertical-align: middle;
   display: inline-block;
   width: calc(100% - 15px);
   overflow-x: hidden;

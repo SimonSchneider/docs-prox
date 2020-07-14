@@ -7,9 +7,11 @@
       "prefix": "SWAGGER_"
     },
     "file": {
-      "enabled": false,
-      "path": "./_config",
-      "prefix": "swagger_"
+      "enabled": true,
+      "path": "./config/files",
+      "prefix": "swagger_",
+      "json-ext": ".json",
+      "url-ext": ".url"
     },
     "kubernetes": {
       "enabled": false
