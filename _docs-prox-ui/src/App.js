@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Icon } from "semantic-ui-react";
 import SwaggerUI from "swagger-ui-react";
 import "swagger-ui-react/swagger-ui.css";
-import styles from "./grid.module.css";
+import styles from "./app.module.css";
 
 async function load() {
   const resp = await fetch("/docs/");
@@ -43,7 +43,7 @@ function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
         {spec.name}
       </div>
       <div
-        className={`${styles.sidebarPin} ${pinned ? styles.pinned : ""}`}
+        className={`${styles.sidebarItemPin} ${pinned ? styles.pinned : ""}`}
         onClick={togglePinned}
       >
         <Icon disabled={!pinned} name="pin" size="small" />

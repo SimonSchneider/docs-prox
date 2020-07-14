@@ -47,17 +47,17 @@
   font-weight: bold;
 }
 
-.sidebarPin {
+.sidebarItemPin {
   float: right;
   width: 15px;
   z-index: 1000;
-  opacity: 20%;
+  opacity: 0.2;
 }
-.sidebarPin:hover {
-  opacity: 100%;
+.sidebarItemPin:hover {
+  opacity: 1.0;
 }
-.sidebarPin.pinned {
-  opacity: 100%;
+.sidebarItemPin.pinned {
+  opacity: 1.0;
 }
 
 .contentWrapper {
