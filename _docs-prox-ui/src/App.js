@@ -5,14 +5,11 @@ import "swagger-ui-react/swagger-ui.css";
 import styles from "./grid.module.css";
 
 async function load() {
-  console.log("loading");
   const resp = await fetch("/docs/");
-  const specs = (await resp.json()).map((r) => ({
+  return (await resp.json()).map((r) => ({
     name: r.name,
     url: r.path,
   }));
-  console.log(specs);
-  return specs;
 }
 
 function getPinned() {
@@ -25,7 +22,6 @@ function setPinned(pinned) {
 }
 
 function addPin(name) {
-  console.log(`adding ping ${name}`);
   const pinned = getPinned();
   if (pinned.includes(name)) {
     return;
@@ -34,7 +30,6 @@ function addPin(name) {
 }
 
 function removePin(name) {
-  console.log(`removing ping ${name}`);
   setPinned(getPinned().filter((p) => p !== name));
 }
 
@@ -42,13 +37,13 @@ function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
   return (
     <div className={styles.sidebarItemWrapper}>
       <div
-        className={selected ? styles.selectedSidebarItem : styles.sidebarItem}
+        className={`${styles.sidebarItem} ${selected ? styles.selected : ""}`}
         onClick={onClick}
       >
         {spec.name}
       </div>
       <div
-        className={pinned ? styles.sidebarPinPinned : styles.sidebarPin}
+        className={`${styles.sidebarPin} ${pinned ? styles.pinned : ""}`}
         onClick={togglePinned}
       >
         <Icon disabled={!pinned} name="pin" size="small" />

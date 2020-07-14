@@ -25,6 +25,7 @@ docker: build build-ui
 build: deps
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux GO111MODULE=on $(GOBUILD) -o $(BINARY_NAME) -v $(MAIN_FILE)
 build-ui:
+	rm -rf _docs-prox-ui/build
 	cd _docs-prox-ui && yarn build
 	rm -rf $(BUILD_DIR)/dist
 	cp -r _docs-prox-ui/build $(BUILD_DIR)/dist

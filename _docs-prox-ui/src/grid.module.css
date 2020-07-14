@@ -1,72 +1,66 @@
 .grid {
-    display: grid;
-    grid-template-columns: max(150px, min(300px, 20%)) auto;
-    grid-template-areas: "sidebar content";
-    height: 100vh;
+  display: grid;
+  grid-template-columns: max(150px, min(300px, 20%)) auto;
+  grid-template-areas: "sidebar content";
+  height: 100vh;
 }
 
 .sidebarWrapper {
-    background-color: white;
-    border-right: 1px solid rgba(0,0,0,0.15);
-    grid-area: sidebar;
-    position: fixed;
-    height: 100%;
-    width: max(150px, min(300px, 20%));
-    z-index: 1000;
-    overflow-y: auto;
-    font-family: sans-serif;
+  background-color: white;
+  border-right: 1px solid rgba(0, 0, 0, 0.15);
+  grid-area: sidebar;
+  position: fixed;
+  height: 100%;
+  width: max(150px, min(300px, 20%));
+  z-index: 1000;
+  overflow-y: auto;
+  font-family: sans-serif;
 }
 
 .sidebar {
-    font-size: 13pt;
-    line-height: 2em;
-    padding-left: 5px;
-    padding-right: 5px;
+  font-size: 13pt;
+  line-height: 2em;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 .sidebarItemWrapper {
-    border-bottom: 1px solid rgba(0,0,0,0.15);
-    padding-left: 5px;
-    padding-right: 5px;
-    cursor: pointer;
-    white-space: nowrap;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  padding-left: 5px;
+  padding-right: 5px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .sidebarHeader {
-    line-height: 3em;
-    padding-left: 5px;
-}
-
-.selectedSidebarItem {
-    color: black;
-    font-weight: bold;
-    display: inline-block;
-    width: calc(100% - 15px);
+  line-height: 3em;
+  padding-left: 5px;
 }
 
 .sidebarItem {
-    color: rgba(82, 82, 82, 0.99);
-    display: inline-block;
-    width: calc(100% - 15px);
+  color: rgba(82, 82, 82, 0.99);
+  display: inline-block;
+  width: calc(100% - 15px);
+}
+.sidebarItem.selected {
+  color: black;
+  font-weight: bold;
 }
 
 .sidebarPin {
-    float: right;
-    width:15px;
-    z-index: 1000;
-    opacity: 20%;
+  float: right;
+  width: 15px;
+  z-index: 1000;
+  opacity: 20%;
 }
 .sidebarPin:hover {
-    opacity: 100%;
+  opacity: 100%;
 }
-.sidebarPinPinned {
-    float: right;
-    width:15px;
-    z-index: 1000;
+.sidebarPin.pinned {
+  opacity: 100%;
 }
 
 .contentWrapper {
-    grid-area: content;
-    overflow-y: scroll;
+  grid-area: content;
+  overflow-y: scroll;
 }
-
