@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/SimonSchneider/docs-prox/openapi"
 
@@ -28,10 +27,6 @@ func main() {
 		panic(err)
 	}
 	fmt.Println("starting server")
-	go func() {
-		<-time.After(1 * time.Second)
-		//cancel()
-	}()
 	_, errChan := openapi.Serve(ctx, repo, conf.Host, conf.Port)
 	select {
 	case err := <-errChan:
