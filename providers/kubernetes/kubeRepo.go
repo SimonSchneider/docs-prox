@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/SimonSchneider/docs-prox/providers/kubernetes/kube"
 
@@ -100,7 +101,7 @@ func (r *kubeWatcher) addSvc(svc *kube.Service) {
 	}
 	url := "http://" + svc.Host + ":" + fmt.Sprintf("%d", port) + path
 	fmt.Printf("storing %s - %s\n", svc.Name, url)
-	r.store.Put(serviceSource, svc.Name, openapi.NewRemoteSpec(url))
+	r.store.Put(serviceSource, svc.Name, openapi.NewCachedRemoteSpec(url, 20*time.Second))
 }
 
 func (r *kubeWatcher) deleteSvc(svc *kube.Service) {
@@ -127,7 +128,7 @@ func (r *kubeWatcher) addRemoteCM(cm *kube.ConfigMap) {
 	data := make(map[string]openapi.Spec)
 	source := sourceOfCM(cm)
 	for key, val := range cm.Data {
-		data[key] = openapi.NewRemoteSpec(val)
+		data[key] = openapi.NewCachedRemoteSpec(val, 20*time.Second)
 	}
 	r.store.ReplaceAllOf(source, data)
 }

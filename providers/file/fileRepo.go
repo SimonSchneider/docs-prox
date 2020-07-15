@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/SimonSchneider/docs-prox/openapi"
 	"github.com/fsnotify/fsnotify"
@@ -25,6 +26,10 @@ func (s *fileSpec) Get() ([]byte, error) {
 	}
 	defer file.Close()
 	return ioutil.ReadAll(file)
+}
+
+func newCachedFileSpec(path string) openapi.Spec {
+	return openapi.Cached(&fileSpec{path: path}, 20*time.Second)
 }
 
 // Configure the store to add the path for json files with prefix
@@ -122,7 +127,7 @@ func (d *dirWatcher) change(path string, cType changeType) {
 func (d *dirWatcher) changeJsonFile(key, path string, cType changeType) {
 	switch cType {
 	case add:
-		d.store.Put(d.source, key, &fileSpec{path})
+		d.store.Put(d.source, key, newCachedFileSpec(path))
 	case remove:
 		d.store.Remove(d.source, key)
 	}
@@ -142,7 +147,7 @@ func (d *dirWatcher) changeUrlFile(key, path string, cType changeType) {
 		for scanner.Scan() {
 			row := scanner.Text()
 			if split := strings.SplitN(row, ": ", 2); len(split) == 2 {
-				specs[strings.Trim(split[0], " ")] = openapi.NewRemoteSpec(strings.Trim(split[1], " "))
+				specs[strings.Trim(split[0], " ")] = openapi.NewCachedRemoteSpec(strings.Trim(split[1], " "), 20*time.Second)
 			} else {
 				log.Fatalf("unexpected file formatting in file %s row %s", path, row)
 			}
