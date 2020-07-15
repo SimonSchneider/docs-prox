@@ -3,3 +3,4 @@
 !Dockerfile
 !config.json
 !.gitignore
+!swagger_demo.url
