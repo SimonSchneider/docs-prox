@@ -55,7 +55,7 @@ func keyHandler(repo Repository) (string, http.Handler) {
 		keys := repo.Keys()
 		prep := make([]KeyUrls, 0, len(keys))
 		for _, k := range keys {
-			prep = append(prep, KeyUrls{Name: k, Path: r.URL.Path + k})
+			prep = append(prep, KeyUrls{Id: k.Key, Name: k.Name, Path: r.URL.Path + k.Key})
 		}
 		err := json.NewEncoder(rw).Encode(prep)
 		if err != nil {
@@ -66,24 +66,25 @@ func keyHandler(repo Repository) (string, http.Handler) {
 
 // KeyUrls is returned in the Keys endpoint
 type KeyUrls struct {
+	Id   string `json:"id"`
 	Name string `json:"name"`
 	Path string `json:"path"`
 }
 
 func docsHandler(repo Repository) (string, http.Handler) {
-	return "/{key}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	return "/{keyId}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		rw.Header().Set("Content-Type", "application/json")
-		key := vars["key"]
-		spec, err := repo.Spec(key)
+		keyId := vars["keyId"]
+		spec, err := repo.Spec(keyId)
 		if err != nil {
-			fmt.Printf("unable to get key %s: %v\n", key, err)
+			fmt.Printf("unable to get keyId %s: %v\n", keyId, err)
 			rw.WriteHeader(http.StatusNotFound)
 			return
 		}
 		bytes, err := spec.Get()
 		if err != nil {
-			fmt.Printf("unable to retrieve spec %s: %v\n", key, err)
+			fmt.Printf("unable to retrieve spec %s: %v\n", keyId, err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}

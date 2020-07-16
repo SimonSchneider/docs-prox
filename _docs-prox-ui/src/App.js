@@ -5,14 +5,10 @@ import "swagger-ui-react/swagger-ui.css";
 import styles from "./app.module.css";
 import { HashRouter, NavLink, Route, Redirect } from "react-router-dom";
 
-function toKey(name) {
-  return name.replace(/\s+/g, "-").toLowerCase();
-}
-
-async function load() {
+async function loadSpecs() {
   const resp = await fetch("/docs/");
   return (await resp.json()).map((r) => ({
-    key: toKey(r.name),
+    key: r.id,
     name: r.name,
     url: r.path,
   }));
@@ -135,7 +131,7 @@ function App() {
   if (!loaded) {
     if (!loading) {
       setLoading(true);
-      load()
+      loadSpecs()
         .then((specs) => setSpecs(specs))
         .then(() => setLoaded(true));
     }

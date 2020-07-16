@@ -75,5 +75,5 @@ func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.Spe
 			return nil, nil, fmt.Errorf("unable to configure kubernetes provider with config %v: %w", conf, err)
 		}
 	}
-	return openapi.Sorted(cachedRepo), apiStore, nil
+	return cachedRepo, apiStore, nil
 }
