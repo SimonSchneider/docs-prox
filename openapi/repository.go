@@ -10,7 +10,7 @@ import (
 // Repository abstracts a documentation provider holding keys and specs
 type Repository interface {
 	Keys() []SpecMetadata
-	Spec(keyId string) (Spec, error)
+	Spec(key string) (Spec, error)
 }
 
 type SpecMetadata struct {
@@ -109,13 +109,13 @@ func (r *cachedRepository) Keys() []SpecMetadata {
 	return keys
 }
 
-func (r *cachedRepository) Spec(keyId string) (Spec, error) {
+func (r *cachedRepository) Spec(key string) (Spec, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if spec, ok := r.specs[keyId]; ok {
+	if spec, ok := r.specs[key]; ok {
 		return spec, nil
 	}
-	return nil, KeyNotFoundError{Repo: "cachedRepo", Key: keyId}
+	return nil, KeyNotFoundError{Repo: "cachedRepo", Key: key}
 }
 
 func (r *cachedRepository) Put(source, name string, spec Spec) {

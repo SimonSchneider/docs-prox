@@ -72,19 +72,19 @@ type KeyUrls struct {
 }
 
 func docsHandler(repo Repository) (string, http.Handler) {
-	return "/{keyId}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	return "/{key}", http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		rw.Header().Set("Content-Type", "application/json")
-		keyId := vars["keyId"]
-		spec, err := repo.Spec(keyId)
+		key := vars["key"]
+		spec, err := repo.Spec(key)
 		if err != nil {
-			fmt.Printf("unable to get keyId %s: %v\n", keyId, err)
+			fmt.Printf("unable to get key %s: %v\n", key, err)
 			rw.WriteHeader(http.StatusNotFound)
 			return
 		}
 		bytes, err := spec.Get()
 		if err != nil {
-			fmt.Printf("unable to retrieve spec %s: %v\n", keyId, err)
+			fmt.Printf("unable to retrieve spec %s: %v\n", key, err)
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
