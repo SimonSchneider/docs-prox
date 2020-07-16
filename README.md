@@ -23,3 +23,10 @@ a sidebar in which we can switch between the available OpenAPI specifications.
 The web-ui allows users to pin services in the sidebar to help with organization.
 
 ![Main view](/_docs/main-view.png)
+
+# Demo
+
+http://34.73.146.17/
+
+Sample APIs taken from
+https://apis.guru/browse-apis/

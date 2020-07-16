@@ -54,16 +54,19 @@ function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
 
 function Sidebar({ specs, selectedSpec, selectSpec }) {
   const [pinned, setPinned] = useState(getPinned());
+  const [filter, setFilter] = useState("");
   function getTogglePinned(name, isPinned) {
     return () => {
       isPinned ? removePin(name) : addPin(name);
       setPinned(getPinned());
     };
   }
-  const allSpecs = specs.map((s) => ({
-    ...s,
-    pinned: pinned.includes(s.name),
-  }));
+  const allSpecs = specs
+    .filter((s) => s.name.toLowerCase().includes(filter.toLowerCase()))
+    .map((s) => ({
+      ...s,
+      pinned: pinned.includes(s.name),
+    }));
   const sortedSpecs = [
     ...allSpecs.filter((s) => s.pinned),
     ...allSpecs.filter((s) => !s.pinned),
@@ -71,7 +74,17 @@ function Sidebar({ specs, selectedSpec, selectSpec }) {
   return (
     <div className={styles.sidebarWrapper}>
       <div className={styles.sidebar}>
-        <div className={styles.sidebarHeader}>Docs Prox</div>
+        <div className={styles.sidebarHeader}>
+          <div>Docs Prox</div>
+          <input
+            style={{
+              width: "100%",
+            }}
+            type={"text"}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          ></input>
+        </div>
         {sortedSpecs.map((spec) => {
           return (
             <SidebarButton
