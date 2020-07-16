@@ -3,10 +3,16 @@ import { Icon } from "semantic-ui-react";
 import SwaggerUI from "swagger-ui-react";
 import "swagger-ui-react/swagger-ui.css";
 import styles from "./app.module.css";
+import { HashRouter, NavLink, Route, Redirect } from "react-router-dom";
+
+function toKey(name) {
+  return name.replace(/\s+/g, "-").toLowerCase();
+}
 
 async function load() {
   const resp = await fetch("/docs/");
   return (await resp.json()).map((r) => ({
+    key: toKey(r.name),
     name: r.name,
     url: r.path,
   }));
@@ -33,15 +39,16 @@ function removePin(name) {
   setPinned(getPinned().filter((p) => p !== name));
 }
 
-function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
+function SidebarButton({ spec, pinned, togglePinned }) {
   return (
     <div className={styles.sidebarItemWrapper}>
-      <div
-        className={`${styles.sidebarItem} ${selected ? styles.selected : ""}`}
-        onClick={onClick}
+      <NavLink
+        to={`/${spec.key}`}
+        activeClassName={styles.selected}
+        className={styles.sidebarItem}
       >
         {spec.name}
-      </div>
+      </NavLink>
       <div
         className={`${styles.sidebarItemPin} ${pinned ? styles.pinned : ""}`}
         onClick={togglePinned}
@@ -52,7 +59,7 @@ function SidebarButton({ spec, selected, pinned, onClick, togglePinned }) {
   );
 }
 
-function Sidebar({ specs, selectedSpec, selectSpec }) {
+function Sidebar({ specs }) {
   const [pinned, setPinned] = useState(getPinned());
   const [filter, setFilter] = useState("");
   function getTogglePinned(name, isPinned) {
@@ -83,58 +90,61 @@ function Sidebar({ specs, selectedSpec, selectSpec }) {
             type={"text"}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-          ></input>
+          />
         </div>
-        {sortedSpecs.map((spec) => {
-          return (
-            <SidebarButton
-              spec={spec}
-              selected={spec.name === selectedSpec.name}
-              onClick={() => selectSpec(spec)}
-              pinned={spec.pinned}
-              togglePinned={getTogglePinned(spec.name, spec.pinned)}
-            />
-          );
-        })}
+        {sortedSpecs.map((spec) => (
+          <SidebarButton
+            spec={spec}
+            pinned={spec.pinned}
+            togglePinned={getTogglePinned(spec.name, spec.pinned)}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
 function Content({ specs }) {
-  const [selectedSpec, selectSpec] = useState(specs[0]);
   return (
     <div className={styles.grid}>
-      <Sidebar
-        specs={specs}
-        selectedSpec={selectedSpec}
-        selectSpec={selectSpec}
-      />
+      <Sidebar specs={specs} />
       <div className={styles.contentWrapper}>
-        <SwaggerUI url={selectedSpec.url} />
+        <Route
+          exact
+          path="/"
+          render={() => <Redirect to={`/${specs[0].key}`} />}
+        />
+        <Route
+          path="/:key"
+          component={({ match }) => {
+            const spec = specs.find((s) => s.key === match.params.key);
+            return <SwaggerUI url={spec ? spec.url : undefined} />;
+          }}
+        />
       </div>
     </div>
   );
-  // {/*<RedocStandalone specUrl={selectedSpec.url} />*/}
 }
 
 function App() {
   const [loaded, setLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [specs, setSpec] = useState([]);
+  const [specs, setSpecs] = useState([]);
   if (!loaded) {
     if (!loading) {
       setLoading(true);
       load()
-        .then((specs) => setSpec(specs))
+        .then((specs) => setSpecs(specs))
         .then(() => setLoaded(true));
     }
     return <div>Loading content</div>;
   }
   return (
-    <div className="App">
-      <Content specs={specs} />
-    </div>
+    <HashRouter>
+      <div className="App">
+        <Content specs={specs} />
+      </div>
+    </HashRouter>
   );
 }
 
