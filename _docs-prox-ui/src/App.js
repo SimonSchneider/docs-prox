@@ -39,7 +39,7 @@ function removePin(name) {
   setPinned(getPinned().filter((p) => p !== name));
 }
 
-function SidebarButton({ spec, pinned, togglePinned }) {
+function SidebarButton({ spec }) {
   return (
     <div className={styles.sidebarItemWrapper}>
       <NavLink
@@ -50,34 +50,40 @@ function SidebarButton({ spec, pinned, togglePinned }) {
         {spec.name}
       </NavLink>
       <div
-        className={`${styles.sidebarItemPin} ${pinned ? styles.pinned : ""}`}
-        onClick={togglePinned}
+        className={`${styles.sidebarItemPin} ${
+          spec.pinned ? styles.pinned : ""
+        }`}
+        onClick={() => {
+          spec.togglePin();
+        }}
       >
-        <Icon disabled={!pinned} name="pin" size="small" />
+        <Icon disabled={!spec.pinned} name="pin" size="small" />
       </div>
     </div>
   );
 }
 
 function Sidebar({ specs }) {
-  const [pinned, setPinned] = useState(getPinned());
-  const [filter, setFilter] = useState("");
-  function getTogglePinned(name, isPinned) {
-    return () => {
-      isPinned ? removePin(name) : addPin(name);
-      setPinned(getPinned());
-    };
-  }
-  const allSpecs = specs
-    .filter((s) => s.name.toLowerCase().includes(filter.toLowerCase()))
-    .map((s) => ({
+  const [pinnedSpecs, setPinnedSpecs] = useState(getPinned());
+  const specsWithPins = specs.map((s) => {
+    const isPinned = pinnedSpecs.includes(s.key);
+    return {
       ...s,
-      pinned: pinned.includes(s.name),
-    }));
+      pinned: isPinned,
+      togglePin: () => {
+        isPinned ? removePin(s.key) : addPin(s.key);
+        setPinnedSpecs(getPinned());
+      },
+    };
+  });
   const sortedSpecs = [
-    ...allSpecs.filter((s) => s.pinned),
-    ...allSpecs.filter((s) => !s.pinned),
+    ...specsWithPins.filter((s) => s.pinned),
+    ...specsWithPins.filter((s) => !s.pinned),
   ];
+  const [filter, setFilter] = useState("");
+  const filteredSpecs = sortedSpecs.filter((s) =>
+    s.name.toLowerCase().includes(filter.toLowerCase())
+  );
   return (
     <div className={styles.sidebarWrapper}>
       <div className={styles.sidebar}>
@@ -92,14 +98,15 @@ function Sidebar({ specs }) {
             onChange={(e) => setFilter(e.target.value)}
           />
         </div>
-        {sortedSpecs.map((spec) => (
-          <SidebarButton
-            spec={spec}
-            pinned={spec.pinned}
-            togglePinned={getTogglePinned(spec.name, spec.pinned)}
-          />
+        {filteredSpecs.map((spec) => (
+          <SidebarButton spec={spec} />
         ))}
       </div>
+      <Route
+        exact
+        path="/"
+        render={() => <Redirect to={`/${sortedSpecs[0].key}`} />}
+      />
     </div>
   );
 }
@@ -109,11 +116,6 @@ function Content({ specs }) {
     <div className={styles.grid}>
       <Sidebar specs={specs} />
       <div className={styles.contentWrapper}>
-        <Route
-          exact
-          path="/"
-          render={() => <Redirect to={`/${specs[0].key}`} />}
-        />
         <Route
           path="/:key"
           component={({ match }) => {
