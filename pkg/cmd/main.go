@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/SimonSchneider/docs-prox/pkg/openapi"
@@ -18,19 +19,19 @@ func main() {
 	}
 	conf, err := config.ReadAndParseFile(path)
 	if err != nil {
-		panic(err)
+		log.Fatalf("unable to parse config file %s: %v", path, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	repo, _, err := conf.BuildRepo(ctx)
 	if err != nil {
-		panic(err)
+		log.Fatalf("unable to build repo from config: %v", err)
 	}
 	fmt.Println("starting server")
 	_, errChan := openapi.Serve(ctx, repo, conf.Host, conf.Port)
 	select {
 	case err := <-errChan:
-		panic(err)
+		log.Fatalf("serve failed with: %v", err)
 	case <-ctx.Done():
 		return
 	}

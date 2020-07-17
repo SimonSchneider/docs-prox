@@ -139,7 +139,7 @@ func (d *dirWatcher) changeURLFile(key, path string, cType changeType) {
 	case add:
 		file, err := os.Open(path)
 		if err != nil {
-			log.Fatalf("unable to parse url file %s: %v", path, err)
+			log.Printf("unable to parse url file %s: %v\n", path, err)
 		}
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -149,11 +149,11 @@ func (d *dirWatcher) changeURLFile(key, path string, cType changeType) {
 			if split := strings.SplitN(row, ": ", 2); len(split) == 2 {
 				specs[strings.Trim(split[0], " ")] = openapi.NewCachedRemoteSpec(strings.Trim(split[1], " "), 20*time.Second)
 			} else {
-				log.Fatalf("unexpected file formatting in file %s row %s", path, row)
+				log.Printf("unexpected file formatting in file %s row '%s'\n", path, row)
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			log.Fatalf("error when scanning file %s: %v", path, err)
+			log.Printf("error when scanning file %s: %v\n", path, err)
 			return
 		}
 		d.store.ReplaceAllOf(source, specs)
