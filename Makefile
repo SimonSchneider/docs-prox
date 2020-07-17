@@ -3,21 +3,21 @@ GOBUILD=$(GOCMD) build
 GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
-BUILD_DIR=_docker
+BUILD_DIR=docker
 DOCKER_NAME=docs-prox
 TAG=1.0.0-snapshot
 BINARY_NAME=$(BUILD_DIR)/main
-MAIN_FILE=cmd/main.go
-OUT_DIR=_out
+MAIN_FILE=pkg/cmd/main.go
+OUT_DIR=out
 COVER_FILE=$(OUT_DIR)/test.cover
-COVER_PKG=$(shell go list ./... | grep -v "**test\|cmd" | paste -s -d"," -)
+COVER_PKG=$(shell go list $(ROOT_GO_DIR) | grep -v "**test\|cmd" | paste -s -d"," -)
 BENCH_N=0
 BENCH_TIME=10s
 BENCH_MEM_FILE=$(OUT_DIR)/memprofile_$(BENCH_N).out
 BENCH_CPU_FILE=$(OUT_DIR)/cpuprofile_$(BENCH_N).out
-BENCH_DIR=decoder
+ROOT_GO_DIR=./pkg/...
 
-all: clean verify build docker
+all: clean verify docker
 run: docker
 	docker run $(DOCKER_NAME):$(TAG)
 docker: build build-ui
@@ -29,22 +29,20 @@ build-ui:
 	cd _docs-prox-ui && yarn build
 	rm -rf $(BUILD_DIR)/dist
 	cp -r _docs-prox-ui/build $(BUILD_DIR)/dist
-verify: race bench
-bench: outdir
-	$(GOTEST) ./$(BENCH_DIR) -bench=. -benchtime $(BENCH_TIME) -benchmem -memprofile "$(BENCH_MEM_FILE)" -cpuprofile "$(BENCH_CPU_FILE)"
+verify: clean race
 cover: test
 	go tool cover -html $(COVER_FILE)
 race: deps lint outdir
-	$(GOTEST) -coverpkg $(COVER_PKG) -coverprofile "$(COVERFILE)" -race ./... -v
+	$(GOTEST) -coverpkg $(COVER_PKG) -coverprofile "$(COVERFILE)" -race $(ROOT_GO_DIR) -v
 	go tool cover -func $(COVER_FILE) | grep total
 test: deps lint outdir
-	$(GOTEST) -coverpkg $(COVER_PKG) -coverprofile "$(COVER_FILE)" ./... -v
+	$(GOTEST) -coverpkg $(COVER_PKG) -coverprofile "$(COVER_FILE)" $(ROOT_GO_DIR) -v
 	go tool cover -func $(COVER_FILE) | grep total
 lint:
 	go mod tidy
-	go fmt ./...
-	go vet ./...
-	golint ./...
+	go fmt $(ROOT_GO_DIR)
+	go vet $(ROOT_GO_DIR)
+	golint $(ROOT_GO_DIR)
 outdir:
 	mkdir -p $(OUT_DIR)
 clean:

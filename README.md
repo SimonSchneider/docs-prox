@@ -22,7 +22,7 @@ The web-ui is a small wrapper of swagger-ui which leverages the server-side to a
 a sidebar in which we can switch between the available OpenAPI specifications.
 The web-ui allows users to pin services in the sidebar to help with organization.
 
-![Main view](/_docs/main-view.png)
+![Main view](/docs/main-view.png)
 
 # Demo
 

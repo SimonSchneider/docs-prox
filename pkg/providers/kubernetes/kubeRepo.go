@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/SimonSchneider/docs-prox/providers/kubernetes/kube"
+	"github.com/SimonSchneider/docs-prox/pkg/providers/kubernetes/kube"
 
-	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
 )
 
 const (

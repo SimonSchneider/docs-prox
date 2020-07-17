@@ -13,19 +13,6 @@ type Spec interface {
 	Get() ([]byte, error)
 }
 
-type staticSpec struct {
-	spec []byte
-}
-
-// NewStaticSpec creates a static spec with an inmemory spec
-func NewStaticSpec(spec []byte) Spec {
-	return &staticSpec{spec: spec}
-}
-
-func (s *staticSpec) Get() ([]byte, error) {
-	return s.spec, nil
-}
-
 type cachedSpec struct {
 	delegate  Spec
 	ttl       time.Duration
@@ -67,6 +54,7 @@ func (c *cachedSpec) getFromDelegateAndUpdateCache() ([]byte, error) {
 	return resp, nil
 }
 
+// Cached returns a spec that wraps and caches the delegate spec
 func Cached(delegate Spec, ttl time.Duration) Spec {
 	return &cachedSpec{
 		delegate: delegate,
@@ -95,6 +83,7 @@ func (s *remoteSpec) Get() ([]byte, error) {
 	return ioutil.ReadAll(resp.Body)
 }
 
+//NewCachedRemoteSpec is a convenience constructor for a cached remote spec
 func NewCachedRemoteSpec(url string, ttl time.Duration) Spec {
 	return Cached(NewRemoteSpec(url), ttl)
 }

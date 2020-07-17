@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -117,14 +117,14 @@ func (d *dirWatcher) change(path string, cType changeType) {
 	if keyType, key, ok := d.getKey(path); ok {
 		switch keyType {
 		case jsonKey:
-			d.changeJsonFile(key, path, cType)
+			d.changeJSONFile(key, path, cType)
 		case urlKey:
-			d.changeUrlFile(key, path, cType)
+			d.changeURLFile(key, path, cType)
 		}
 	}
 }
 
-func (d *dirWatcher) changeJsonFile(key, path string, cType changeType) {
+func (d *dirWatcher) changeJSONFile(key, path string, cType changeType) {
 	switch cType {
 	case add:
 		d.store.Put(d.source, key, newCachedFileSpec(path))
@@ -133,7 +133,7 @@ func (d *dirWatcher) changeJsonFile(key, path string, cType changeType) {
 	}
 }
 
-func (d *dirWatcher) changeUrlFile(key, path string, cType changeType) {
+func (d *dirWatcher) changeURLFile(key, path string, cType changeType) {
 	source := fmt.Sprintf("%s-%s", d.source, key)
 	switch cType {
 	case add:
@@ -162,14 +162,14 @@ func (d *dirWatcher) changeUrlFile(key, path string, cType changeType) {
 	}
 }
 
-type KeyType int32
+type keyType int32
 
 const (
-	jsonKey KeyType = iota
+	jsonKey keyType = iota
 	urlKey
 )
 
-func (d *dirWatcher) getKey(path string) (KeyType, string, bool) {
+func (d *dirWatcher) getKey(path string) (keyType, string, bool) {
 	fileName := filepath.Base(path)
 	if strings.HasPrefix(fileName, d.prefix) {
 		withoutPrefix := strings.TrimPrefix(fileName, d.prefix)

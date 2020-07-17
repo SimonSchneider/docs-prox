@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
 
-	"github.com/SimonSchneider/docs-prox/config"
+	"github.com/SimonSchneider/docs-prox/pkg/config"
 )
 
 func main() {

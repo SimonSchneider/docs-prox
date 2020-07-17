@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
 )
 
 // Configure the repository from the configuration

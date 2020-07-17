@@ -7,7 +7,7 @@ import Sidebar from "./Sidebar";
 async function loadSpecs() {
   const resp = await fetch("/docs/");
   return (await resp.json()).map((r) => ({
-    key: r.id,
+    key: r.key,
     name: r.name,
     url: r.path,
   }));

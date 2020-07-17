@@ -19,12 +19,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/SimonSchneider/docs-prox/test/shell"
+	"github.com/SimonSchneider/docs-prox/pkg/test/shell"
 
-	"github.com/SimonSchneider/docs-prox/test/await"
+	"github.com/SimonSchneider/docs-prox/pkg/test/await"
 
-	"github.com/SimonSchneider/docs-prox/config"
-	"github.com/SimonSchneider/docs-prox/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/config"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
 )
 
 func TestCombiningDifferentProviders(t *testing.T) {
@@ -42,10 +42,10 @@ func TestCombiningDifferentProviders(t *testing.T) {
 	defer fileSpecServer.Close()
 	check(t, os.Setenv(envPrefix+"TEST", httpSpecServer.Add("test")))
 	check(t, os.Setenv("NOT_EXISTING", httpSpecServer.Add("notRegistered")))
-	check(t, fileSpecServer.AddJsonFile("test-file-not-found.json"))
-	check(t, fileSpecServer.AddJsonFile("swagger-not-found2.txt"))
-	check(t, fileSpecServer.AddJsonFile("swagger-found-file.json"))
-	check(t, fileSpecServer.AddUrlFile("swagger-found-url.url", map[string]string{"file-url-spec": httpSpecServer.Add("file-url-spec")}))
+	check(t, fileSpecServer.AddJSONFile("test-file-not-found.json"))
+	check(t, fileSpecServer.AddJSONFile("swagger-not-found2.txt"))
+	check(t, fileSpecServer.AddJSONFile("swagger-found-file.json"))
+	check(t, fileSpecServer.AddURLFile("swagger-found-url.url", map[string]string{"file-url-spec": httpSpecServer.Add("file-url-spec")}))
 	specServer := AllOf(httpSpecServer, fileSpecServer)
 	tests := []struct {
 		name            string
@@ -100,15 +100,15 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	check(t, err)
 	defer fileSpecServer.Close()
-	check(t, fileSpecServer.AddJsonFile("swagger-found-file-1.json"))
+	check(t, fileSpecServer.AddJSONFile("swagger-found-file-1.json"))
 	client, err := runOpenAPIServer(TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix})
 	check(t, err)
 	check(t, validate(client, 1, fileSpecServer))
-	check(t, fileSpecServer.AddJsonFile("swagger-found-file-2.json"))
+	check(t, fileSpecServer.AddJSONFile("swagger-found-file-2.json"))
 	check(t, await.That(func() error {
 		return validate(client, 2, fileSpecServer)
 	}))
-	check(t, fileSpecServer.AddJsonFile("not-found-file.txt"))
+	check(t, fileSpecServer.AddJSONFile("not-found-file.txt"))
 	check(t, await.That(func() error {
 		return validate(client, 2, fileSpecServer)
 	}))
@@ -333,7 +333,7 @@ func (f *fileSpecServer) Get(key string) (SpecResp, bool) {
 	return s, ok
 }
 
-func (f *fileSpecServer) AddJsonFile(fileName string) error {
+func (f *fileSpecServer) AddJSONFile(fileName string) error {
 	resp := randomSwaggerResp()
 	path := filepath.Join(f.dir, fileName)
 	file, err := os.Create(path)
@@ -351,7 +351,7 @@ func (f *fileSpecServer) AddJsonFile(fileName string) error {
 	return nil
 }
 
-func (f *fileSpecServer) AddUrlFile(fileName string, specs map[string]string) error {
+func (f *fileSpecServer) AddURLFile(fileName string, specs map[string]string) error {
 	path := filepath.Join(f.dir, fileName)
 	file, err := os.Create(path)
 	if err != nil {

@@ -7,11 +7,11 @@ import (
 	"io"
 	"os"
 
-	"github.com/SimonSchneider/docs-prox/providers/environment"
+	"github.com/SimonSchneider/docs-prox/pkg/providers/environment"
 
-	"github.com/SimonSchneider/docs-prox/openapi"
-	"github.com/SimonSchneider/docs-prox/providers/file"
-	"github.com/SimonSchneider/docs-prox/providers/kubernetes"
+	"github.com/SimonSchneider/docs-prox/pkg/openapi"
+	"github.com/SimonSchneider/docs-prox/pkg/providers/file"
+	"github.com/SimonSchneider/docs-prox/pkg/providers/kubernetes"
 )
 
 // Config is the json config file struct
@@ -27,8 +27,8 @@ type Config struct {
 			Enabled bool   `json:"enabled"`
 			Path    string `json:"path"`
 			Prefix  string `json:"prefix"`
-			JsonExt string `json:"json-ext"`
-			UrlExt  string `json:"url-ext"`
+			JSONExt string `json:"json-ext"`
+			URLExt  string `json:"url-ext"`
 		} `json:"file"`
 		Kubernetes struct {
 			Enabled bool `json:"enabled"`
@@ -64,7 +64,7 @@ func (c *Config) BuildRepo(ctx context.Context) (openapi.Repository, openapi.Spe
 		environment.Configure(apiStore, conf.Prefix)
 	}
 	if conf := c.Providers.File; conf.Enabled {
-		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix, conf.JsonExt, conf.UrlExt)
+		err := file.Configure(ctx, apiStore, conf.Path, conf.Prefix, conf.JSONExt, conf.URLExt)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to configure file provider with config %v: %w", conf, err)
 		}

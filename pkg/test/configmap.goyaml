@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/SimonSchneider/docs-prox/test.ConfigMapTemplate*/ -}}
+{{- /*gotype: github.com/SimonSchneider/docs-prox/pgk/test.ConfigMapTemplate*/ -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

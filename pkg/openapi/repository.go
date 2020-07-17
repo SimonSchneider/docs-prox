@@ -13,10 +13,12 @@ type Repository interface {
 	Spec(key string) (Spec, error)
 }
 
+// SpecMetadata contains metadata regarding the spec
 type SpecMetadata struct {
 	Key, Name string
 }
 
+// SpecMetadataOf name
 func SpecMetadataOf(name string) SpecMetadata {
 	return SpecMetadata{
 		Key:  strings.ToLower(strings.ReplaceAll(name, " ", "-")),
@@ -81,10 +83,10 @@ type SpecRepoStore interface {
 type cachedRepository struct {
 	mu      *sync.RWMutex
 	sources map[string]map[string]struct{}
-	specs   *SortedMap
+	specs   *sortedMap
 }
 
-type KeySpec struct {
+type keySpec struct {
 	SpecMetadata
 	Spec
 }
@@ -94,15 +96,15 @@ func NewCachedRepository() SpecRepoStore {
 	return &cachedRepository{
 		mu:      &sync.RWMutex{},
 		sources: make(map[string]map[string]struct{}),
-		specs:   NewSortedMap(),
+		specs:   newSortedMap(),
 	}
 }
 
 func (r *cachedRepository) Keys() []SpecMetadata {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	keys := make([]SpecMetadata, 0, r.specs.Len())
-	r.specs.RangeOver(func(k string, v KeySpec) {
+	keys := make([]SpecMetadata, 0, r.specs.len())
+	r.specs.rangeOver(func(k string, v keySpec) {
 		keys = append(keys, v.SpecMetadata)
 	})
 	return keys
@@ -111,7 +113,7 @@ func (r *cachedRepository) Keys() []SpecMetadata {
 func (r *cachedRepository) Spec(key string) (Spec, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if spec, ok := r.specs.Get(key); ok {
+	if spec, ok := r.specs.get(key); ok {
 		return spec, nil
 	}
 	return nil, KeyNotFoundError{Repo: "cachedRepo", Key: key}
@@ -125,7 +127,7 @@ func (r *cachedRepository) Put(source, name string, spec Spec) {
 	}
 	key := SpecMetadataOf(name)
 	r.sources[source][key.Key] = struct{}{}
-	r.specs.Set(key.Key, KeySpec{
+	r.specs.set(key.Key, keySpec{
 		SpecMetadata: key,
 		Spec:         spec,
 	})
@@ -134,16 +136,16 @@ func (r *cachedRepository) Put(source, name string, spec Spec) {
 func (r *cachedRepository) ReplaceAllOf(source string, specs map[string]Spec) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	multi := r.specs.NewMultiChange()
-	defer multi.Finished()
+	multi := r.specs.newMultiChange()
+	defer multi.finished()
 	for key := range r.sources[source] {
-		multi.Delete(key)
+		multi.delete(key)
 	}
 	r.sources[source] = make(map[string]struct{}, len(specs))
 	for name, spec := range specs {
 		key := SpecMetadataOf(name)
 		r.sources[source][key.Key] = struct{}{}
-		multi.Set(key.Key, KeySpec{
+		multi.set(key.Key, keySpec{
 			SpecMetadata: key,
 			Spec:         spec,
 		})
@@ -155,66 +157,66 @@ func (r *cachedRepository) Remove(source, name string) {
 	defer r.mu.Unlock()
 	key := SpecMetadataOf(name)
 	delete(r.sources[source], key.Key)
-	r.specs.Delete(key.Key)
+	r.specs.delete(key.Key)
 }
 
 func (r *cachedRepository) RemoveAllOf(source string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	multi := r.specs.NewMultiChange()
-	defer multi.Finished()
+	multi := r.specs.newMultiChange()
+	defer multi.finished()
 	for key := range r.sources[source] {
-		multi.Delete(key)
+		multi.delete(key)
 	}
 	delete(r.sources, source)
 }
 
-type SortedMap struct {
-	m map[string]KeySpec
+type sortedMap struct {
+	m map[string]keySpec
 	l []string
 }
 
-func NewSortedMap() *SortedMap {
-	return &SortedMap{
-		m: make(map[string]KeySpec),
+func newSortedMap() *sortedMap {
+	return &sortedMap{
+		m: make(map[string]keySpec),
 		l: make([]string, 0),
 	}
 }
 
-func (s *SortedMap) RangeOver(fun func(string, KeySpec)) {
+func (s *sortedMap) rangeOver(fun func(string, keySpec)) {
 	for _, k := range s.l {
 		fun(k, s.m[k])
 	}
 }
 
-func (s *SortedMap) Get(key string) (KeySpec, bool) {
+func (s *sortedMap) get(key string) (keySpec, bool) {
 	val, ok := s.m[key]
 	return val, ok
 }
 
-func (s *SortedMap) Len() int {
+func (s *sortedMap) len() int {
 	return len(s.m)
 }
 
-func (s *SortedMap) setUnsafe(key string, val KeySpec) {
+func (s *sortedMap) setUnsafe(key string, val keySpec) {
 	s.m[key] = val
 }
 
-func (s *SortedMap) deleteUnsafe(key string) {
+func (s *sortedMap) deleteUnsafe(key string) {
 	delete(s.m, key)
 }
 
-func (s *SortedMap) Set(key string, val KeySpec) {
+func (s *sortedMap) set(key string, val keySpec) {
 	s.setUnsafe(key, val)
 	s.updateSort()
 }
 
-func (s *SortedMap) Delete(key string) {
+func (s *sortedMap) delete(key string) {
 	s.deleteUnsafe(key)
 	s.updateSort()
 }
 
-func (s *SortedMap) updateSort() {
+func (s *sortedMap) updateSort() {
 	s.l = s.l[0:0]
 	for k := range s.m {
 		s.l = append(s.l, k)
@@ -222,24 +224,24 @@ func (s *SortedMap) updateSort() {
 	sort.Strings(s.l)
 }
 
-type MultiChange struct {
-	s *SortedMap
+type multiChange struct {
+	s *sortedMap
 }
 
-func (m *MultiChange) Set(key string, val KeySpec) {
+func (m *multiChange) set(key string, val keySpec) {
 	m.s.setUnsafe(key, val)
 }
 
-func (m *MultiChange) Delete(key string) {
+func (m *multiChange) delete(key string) {
 	m.s.deleteUnsafe(key)
 }
 
-func (m *MultiChange) Finished() {
+func (m *multiChange) finished() {
 	m.s.updateSort()
 }
 
-func (s *SortedMap) NewMultiChange() *MultiChange {
-	return &MultiChange{
+func (s *sortedMap) newMultiChange() *multiChange {
+	return &multiChange{
 		s: s,
 	}
 }

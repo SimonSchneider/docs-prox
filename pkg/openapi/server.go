@@ -55,7 +55,7 @@ func keyHandler(repo Repository) (string, http.Handler) {
 		keys := repo.Keys()
 		prep := make([]KeyUrls, 0, len(keys))
 		for _, k := range keys {
-			prep = append(prep, KeyUrls{Id: k.Key, Name: k.Name, Path: r.URL.Path + k.Key})
+			prep = append(prep, KeyUrls{Key: k.Key, Name: k.Name, Path: r.URL.Path + k.Key})
 		}
 		err := json.NewEncoder(rw).Encode(prep)
 		if err != nil {
@@ -66,7 +66,7 @@ func keyHandler(repo Repository) (string, http.Handler) {
 
 // KeyUrls is returned in the Keys endpoint
 type KeyUrls struct {
-	Id   string `json:"id"`
+	Key  string `json:"key"`
 	Name string `json:"name"`
 	Path string `json:"path"`
 }
