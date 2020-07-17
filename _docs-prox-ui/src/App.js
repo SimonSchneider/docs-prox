@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { HashRouter, Route } from "react-router-dom";
+import { HashRouter } from "react-router-dom";
 import styles from "./app.module.css";
 import SpecContent from "./SpecContent";
 import Sidebar from "./Sidebar";
