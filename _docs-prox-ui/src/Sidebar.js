@@ -56,7 +56,7 @@ function Sidebar({ specs }) {
           <div>Docs Prox</div>
           <input
             style={{
-              width: "100%",
+              width: "95%",
             }}
             type={"text"}
             value={filter}

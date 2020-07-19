@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -96,7 +97,7 @@ func TestCombiningDifferentProviders(t *testing.T) {
 	}
 }
 
-func TestFileServerMutateDuringRun(t *testing.T) {
+func TestFileServerMutateJsonDuringRun(t *testing.T) {
 	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
 	check(t, err)
 	defer fileSpecServer.Close()
@@ -116,6 +117,79 @@ func TestFileServerMutateDuringRun(t *testing.T) {
 	check(t, await.That(func() error {
 		return validate(client, 1, fileSpecServer)
 	}))
+}
+
+func TestFileServerMutateUrlDuringRun(t *testing.T) {
+	fileSpecServer, err := newFileSpecServer("swagger-", ".json")
+	check(t, err)
+	defer fileSpecServer.Close()
+	client, err := runOpenAPIServer(TmplConfig{FilePath: fileSpecServer.dir, FilePrefix: fileSpecServer.prefix})
+	verifyKeys := func(expectedKeys ...string) error {
+		keys, err := client.getKeys()
+		check(t, err)
+		if len(keys) != len(expectedKeys) {
+			return fmt.Errorf("unexpected number of keys %d expected %d", len(keys), len(expectedKeys))
+		}
+		for _, k := range keys {
+			foundKey := false
+			for _, fk := range expectedKeys {
+				if fk == k.Name {
+					foundKey = true
+				}
+			}
+			if !foundKey {
+				return fmt.Errorf("couldn't find key %v in expected %v", k, expectedKeys)
+			}
+		}
+		return nil
+	}
+	file1, key1, url1 := "swagger-found-file-1.url", "key1", "url1"
+	check(t, err)
+	check(t, fileSpecServer.AddURLFile(file1, map[string]string{key1: url1}))
+	check(t, await.That(func() error { return verifyKeys(key1) }))
+	file2, key2, url2 := "swagger-found-file-2.url", "key2", "url2"
+	check(t, fileSpecServer.AddURLFile(file2, map[string]string{key2: url2}))
+	check(t, await.That(func() error { return verifyKeys(key1, key2) }))
+	check(t, fileSpecServer.Delete("swagger-found-file-1.url"))
+	check(t, await.That(func() error { return verifyKeys(key2) }))
+	check(t, fileSpecServer.OpenAndAppendToFile(file2, func(w io.Writer) error {
+		writer := bufio.NewWriter(w)
+		defer writer.Flush()
+		_, err := writer.WriteString("this is incorrectly encoded\n")
+		return err
+	}))
+	nCheck("after appending bad", t, await.That(func() error { return verifyKeys(key2) }))
+	check(t, fileSpecServer.OpenAndAppendToFile(file2, func(w io.Writer) error {
+		return writeMap(w, map[string]string{key1: url1})
+	}))
+	nCheck("after appending good", t, await.That(func() error { return verifyKeys(key1, key2) }))
+}
+
+func Test404OnMissingKey(t *testing.T) {
+	c, err := runOpenAPIServer(TmplConfig{})
+	check(t, err)
+	get, err := c.get(fmt.Sprintf("/docs/non-existing-key"))
+	check(t, err)
+	if get.StatusCode != http.StatusNotFound {
+		t.Errorf("found key that should not be found %s", get.Status)
+	}
+}
+
+func Test500OnBrokenUpstream(t *testing.T) {
+	envPrefix := "SWAGGER_"
+	check(t, os.Setenv(envPrefix+"TEST", "http://localhost:8080/does/not/exist"))
+	c, err := runOpenAPIServer(TmplConfig{EnvPrefix: envPrefix})
+	check(t, err)
+	keys, err := c.getKeys()
+	check(t, err)
+	if len(keys) != 1 {
+		t.Errorf("unexpected length of keys %v", keys)
+	}
+	r, err := c.get(keys[0].Path)
+	check(t, err)
+	if r.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected 500 got %d %s", r.StatusCode, r.Status)
+	}
 }
 
 func runOpenAPIServer(tmplConfig TmplConfig) (*testClient, error) {
@@ -189,7 +263,7 @@ func newTestClient(addr net.Addr) *testClient {
 }
 
 func (t *testClient) getKeys() ([]openapi.KeyUrls, error) {
-	res, err := t.client.Get(fmt.Sprintf("%s/docs/", t.addr))
+	res, err := t.get("/docs/")
 	if err != nil {
 		return nil, fmt.Errorf("unable to do keys request: %w", err)
 	}
@@ -205,8 +279,12 @@ func (t *testClient) getKeys() ([]openapi.KeyUrls, error) {
 	return keys, nil
 }
 
+func (t *testClient) get(path string) (*http.Response, error) {
+	return t.client.Get(fmt.Sprintf("%s%s", t.addr, path))
+}
+
 func (t *testClient) getSpec(path string) (SpecResp, error) {
-	res, err := t.client.Get(fmt.Sprintf("%s%s", t.addr, path))
+	res, err := t.get(path)
 	if err != nil {
 		return SpecResp{}, fmt.Errorf("unable to do spec request: %w", err)
 	}
@@ -333,17 +411,39 @@ func (f *fileSpecServer) Get(key string) (SpecResp, bool) {
 	return s, ok
 }
 
-func (f *fileSpecServer) AddJSONFile(fileName string) error {
-	resp := randomSwaggerResp()
+func (f *fileSpecServer) CreateAndWriteToFile(fileName string, writeTo func(w io.Writer) error) error {
 	path := filepath.Join(f.dir, fileName)
 	file, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("unable to create file %s: %w", path, err)
 	}
 	defer file.Close()
-	err = json.NewEncoder(file).Encode(resp)
+	if err := writeTo(file); err != nil {
+		return fmt.Errorf("error writing to file %s, %w", path, err)
+	}
+	return nil
+}
+
+func (f *fileSpecServer) OpenAndAppendToFile(filename string, writeTo func(w io.Writer) error) error {
+	path := filepath.Join(f.dir, filename)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return fmt.Errorf("unable to write to file %s: %w", path, err)
+		return fmt.Errorf("unable to open file %s: %w", path, err)
+	}
+	defer file.Close()
+	if err := writeTo(file); err != nil {
+		return fmt.Errorf("error writing to file %s, %w", path, err)
+	}
+	return nil
+}
+
+func (f *fileSpecServer) AddJSONFile(fileName string) error {
+	resp := randomSwaggerResp()
+	err := f.CreateAndWriteToFile(fileName, func(w io.Writer) error {
+		return json.NewEncoder(w).Encode(resp)
+	})
+	if err != nil {
+		return err
 	}
 	f.fileIsSpec(fileName, func(key string) {
 		f.specs[key] = resp
@@ -352,21 +452,9 @@ func (f *fileSpecServer) AddJSONFile(fileName string) error {
 }
 
 func (f *fileSpecServer) AddURLFile(fileName string, specs map[string]string) error {
-	path := filepath.Join(f.dir, fileName)
-	file, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("unable to create file %s: %w", path, err)
-	}
-	defer file.Close()
-	writer := bufio.NewWriter(file)
-	defer writer.Flush()
-	for key, spec := range specs {
-		_, err := writer.WriteString(fmt.Sprintf("%s: %s", key, spec))
-		if err != nil {
-			return fmt.Errorf("unable to write to file %s: %w", path, err)
-		}
-	}
-	return nil
+	return f.CreateAndWriteToFile(fileName, func(w io.Writer) error {
+		return writeMap(w, specs)
+	})
 }
 
 func (f *fileSpecServer) Delete(fileName string) error {
@@ -380,6 +468,18 @@ func (f *fileSpecServer) fileIsSpec(fileName string, fun func(name string)) {
 	if strings.HasPrefix(fileName, f.prefix) && strings.HasSuffix(fileName, f.ext) {
 		fun(strings.TrimPrefix(strings.TrimSuffix(fileName, f.ext), f.prefix))
 	}
+}
+
+func writeMap(w io.Writer, toWrite map[string]string) error {
+	writer := bufio.NewWriter(w)
+	defer writer.Flush()
+	for key, spec := range toWrite {
+		_, err := writer.WriteString(fmt.Sprintf("%s: %s\n", key, spec))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type minikube struct {
@@ -553,8 +653,14 @@ func (t *testConfig) configWith(conf TmplConfig) (string, error) {
 	return path, nil
 }
 
+func nCheck(op string, t *testing.T, err error) {
+	if err != nil {
+		t.Errorf("op: '%s', unexpected error: %v", op, err)
+	}
+}
+
 func check(t *testing.T, err error) {
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }

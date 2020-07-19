@@ -28,11 +28,9 @@ function App() {
   }
   return (
     <HashRouter>
-      <div className="App">
-        <div className={styles.grid}>
-          <Sidebar specs={specs} />
-          <SpecContent specs={specs} />
-        </div>
+      <div className={`App ${styles.grid}`}>
+        <Sidebar specs={specs} />
+        <SpecContent specs={specs} />
       </div>
     </HashRouter>
   );

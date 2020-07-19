@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -38,9 +39,9 @@ func (e KeyNotFoundError) Error() string {
 
 // SpecStore is a concurrent Spec store
 type SpecStore interface {
-	Put(source, key string, spec Spec)
+	Put(source, key string, spec Spec) error
 	ReplaceAllOf(source string, specs map[string]Spec)
-	Remove(source, key string)
+	Remove(source, key string) error
 	RemoveAllOf(source string)
 }
 
@@ -53,9 +54,9 @@ func Logging(delegate SpecStore) SpecStore {
 	return &loggingSpecStore{delegate: delegate}
 }
 
-func (l *loggingSpecStore) Put(source, key string, spec Spec) {
+func (l *loggingSpecStore) Put(source, key string, spec Spec) error {
 	fmt.Printf("Putting (%s - %s)\n", source, key)
-	l.delegate.Put(source, key, spec)
+	return l.delegate.Put(source, key, spec)
 }
 
 func (l *loggingSpecStore) ReplaceAllOf(source string, specs map[string]Spec) {
@@ -63,9 +64,9 @@ func (l *loggingSpecStore) ReplaceAllOf(source string, specs map[string]Spec) {
 	l.delegate.ReplaceAllOf(source, specs)
 }
 
-func (l *loggingSpecStore) Remove(source, key string) {
+func (l *loggingSpecStore) Remove(source, key string) error {
 	fmt.Printf("Removing (%s - %s)\n", source, key)
-	l.delegate.Remove(source, key)
+	return l.delegate.Remove(source, key)
 }
 
 func (l *loggingSpecStore) RemoveAllOf(source string) {
@@ -114,23 +115,46 @@ func (r *cachedRepository) Spec(key string) (Spec, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if spec, ok := r.specs.get(key); ok {
-		return spec, nil
+		return spec.Spec, nil
 	}
 	return nil, KeyNotFoundError{Repo: "cachedRepo", Key: key}
 }
 
-func (r *cachedRepository) Put(source, name string, spec Spec) {
+func (r *cachedRepository) sourceOfKey(key string) (string, bool) {
+	for source, specs := range r.sources {
+		if _, ok := specs[key]; ok {
+			return source, true
+		}
+	}
+	return "", false
+}
+
+func (r *cachedRepository) checkForConflict(source, key string) error {
+	if _, ok := r.specs.get(key); !ok {
+		return nil
+	}
+	if currSource, found := r.sourceOfKey(key); found && currSource != source {
+		return fmt.Errorf("confliciting key: key %s is already owned by source %s", key, currSource)
+	}
+	return nil
+}
+
+func (r *cachedRepository) Put(source, name string, spec Spec) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.sources[source]; !ok {
 		r.sources[source] = make(map[string]struct{})
 	}
 	key := SpecMetadataOf(name)
+	if err := r.checkForConflict(source, key.Key); err != nil {
+		return err
+	}
 	r.sources[source][key.Key] = struct{}{}
 	r.specs.set(key.Key, keySpec{
 		SpecMetadata: key,
 		Spec:         spec,
 	})
+	return nil
 }
 
 func (r *cachedRepository) ReplaceAllOf(source string, specs map[string]Spec) {
@@ -144,6 +168,10 @@ func (r *cachedRepository) ReplaceAllOf(source string, specs map[string]Spec) {
 	r.sources[source] = make(map[string]struct{}, len(specs))
 	for name, spec := range specs {
 		key := SpecMetadataOf(name)
+		if err := r.checkForConflict(source, key.Key); err != nil {
+			log.Printf("ignoring key %s from source %s when replacing all: %v", key, source, err)
+			continue
+		}
 		r.sources[source][key.Key] = struct{}{}
 		multi.set(key.Key, keySpec{
 			SpecMetadata: key,
@@ -152,12 +180,16 @@ func (r *cachedRepository) ReplaceAllOf(source string, specs map[string]Spec) {
 	}
 }
 
-func (r *cachedRepository) Remove(source, name string) {
+func (r *cachedRepository) Remove(source, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := SpecMetadataOf(name)
 	delete(r.sources[source], key.Key)
+	if currSource, found := r.sourceOfKey(key.Key); found {
+		return fmt.Errorf("key %s already owned by %s", key, currSource)
+	}
 	r.specs.delete(key.Key)
+	return nil
 }
 
 func (r *cachedRepository) RemoveAllOf(source string) {
