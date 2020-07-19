@@ -30,3 +30,42 @@ http://34.73.146.17/
 
 Sample APIs taken from
 https://apis.guru/browse-apis/
+
+## Configuration
+
+There are currently 3 different docs-discovery-providers. Each key/name
+(the name in the sidebar of the UI) must be globally unique and whatever
+provider is first to register that name is the owner of it.
+
+### Environment Provider
+Looks for env variables with a configurable prefix and adds them 
+assuming the content is a URL pointing at the openAPI documentation
+ie. prefix is `SWAGGER_` and an env variable
+`export SWAGGER_TEST_1=http://test1.com/openapi` will configure a entry in the
+UI with name `test-1` proxying the openAPI spec at `http://test1.com/openapi`
+
+### File Provider
+Looks for files in a configurable directory, the files should have a configurable
+prefix and one of two file-extensions denoting the two supported file types.
+
+The directory will be watched for changes and any updates to existing files,
+removing of files or adding of new files will be immediately reflected in the UI.
+
+#### Json
+Files with extension `.json` should contain the json openAPI specification
+
+#### Url
+Files with extension `.url` should contain one `name: url` pair per row.
+They will be added to the UI with service name `$name` and proxy the URL `$url`.
+ie.
+```
+service 123: http://service123.com/openapi
+another service: http://another-service.com/openapi
+```
+
+### Kubernetes Provider
+Watches a kubernetes cluster for two types of resources.
+
+#### Service
+
+#### ConfigMap
